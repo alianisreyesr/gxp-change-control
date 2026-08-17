@@ -1,0 +1,177 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_run:
+    workflows:
+      - CI
+      - CodeQL
+      - SonarQube / SonarCloud
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: release-${{ github.event.workflow_run.head_sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish release
+    if: >-
+      github.event_name == 'push' ||
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event_name == 'workflow_run' &&
+        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.conclusion == 'success'
+      )
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+    steps:
+      - name: Checkout release commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          fetch-depth: 0
+
+      - name: Evaluate release gate
+        id: gate
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          subject="$(git show -s --format=%s "$RELEASE_SHA")"
+          if [[ "$subject" != release:* ]]; then
+            echo "::notice::Commit is not a release commit: $subject"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          runs_file="$RUNNER_TEMP/release-runs.json"
+          gh run list \
+            --repo "$GITHUB_REPOSITORY" \
+            --commit "$RELEASE_SHA" \
+            --limit 50 \
+            --json name,status,conclusion,headSha,createdAt,event \
+            > "$runs_file"
+
+          RUNS_FILE="$runs_file" python - <<'PY'
+          import json
+          import os
+          import sys
+          from pathlib import Path
+
+          required = {"CI", "CodeQL", "SonarQube / SonarCloud"}
+          release_sha = os.environ["RELEASE_SHA"]
+          runs = json.loads(Path(os.environ["RUNS_FILE"]).read_text(encoding="utf-8"))
+
+          latest = {}
+          for run in runs:
+              if run.get("headSha") != release_sha:
+                  continue
+              name = run.get("name")
+              if name not in required:
+                  continue
+              previous = latest.get(name)
+              if previous is None or run.get("createdAt", "") > previous.get("createdAt", ""):
+                  latest[name] = run
+
+          missing = sorted(required - latest.keys())
+          unfinished = sorted(
+              name for name, run in latest.items() if run.get("status") != "completed"
+          )
+          failed = sorted(
+              name
+              for name, run in latest.items()
+              if run.get("status") == "completed" and run.get("conclusion") != "success"
+          )
+
+          if failed:
+              print(f"::error::Release blocked by failed workflows: {', '.join(failed)}")
+              sys.exit(1)
+
+          output = Path(os.environ["GITHUB_OUTPUT"])
+          if missing or unfinished:
+              details = []
+              if missing:
+                  details.append(f"missing={','.join(missing)}")
+              if unfinished:
+                  details.append(f"unfinished={','.join(unfinished)}")
+              print(f"::notice::Release gate not complete ({'; '.join(details)})")
+              with output.open("a", encoding="utf-8") as stream:
+                  stream.write("publish=false\n")
+              sys.exit(0)
+
+          print("All required workflows completed successfully for the release commit")
+          with output.open("a", encoding="utf-8") as stream:
+              stream.write("publish=true\n")
+          PY
+
+      - name: Resolve release metadata
+        id: metadata
+        if: steps.gate.outputs.publish == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          version="$(python - <<'PY'
+          import re
+          from pathlib import Path
+
+          text = Path("app/main.py").read_text(encoding="utf-8")
+          match = re.search(r'^APP_VERSION = "([^"]+)"$', text, re.MULTILINE)
+          if not match:
+              raise SystemExit("APP_VERSION was not found in app/main.py")
+          print(match.group(1))
+          PY
+          )"
+
+          tag="v$version"
+          notes="docs/releases/$tag.md"
+          if [[ ! -f "$notes" ]]; then
+            echo "::error::Release notes not found: $notes"
+            exit 1
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "notes=$notes" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub release
+        if: steps.gate.outputs.publish == 'true'
+        shell: bash
+        env:
+          TAG: ${{ steps.metadata.outputs.tag }}
+          NOTES: ${{ steps.metadata.outputs.notes }}
+        run: |
+          set -euo pipefail
+
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::notice::Release $TAG already exists; publication is idempotent."
+            exit 0
+          fi
+
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$RELEASE_SHA" \
+            --title "GxP Change Control $TAG" \
+            --notes-file "$NOTES"
+
+      - name: Verify published release
+        if: steps.gate.outputs.publish == 'true'
+        shell: bash
+        env:
+          TAG: ${{ steps.metadata.outputs.tag }}
+        run: |
+          set -euo pipefail
+          gh release view "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --json tagName,isDraft,isPrerelease,url,targetCommitish

@@ -22,7 +22,7 @@
 - [x] Recorded impact evidence and activity-history views
 - [x] Ajv client validation with server-schema retrieval and local fallback
 
-### Quality and governance
+### Quality, governance, and release
 
 - [x] 68 pytest tests across model, API, schema, time-zone, and full-workflow behavior
 - [x] TypeScript type checking and Vite production build
@@ -32,6 +32,8 @@
 - [x] Optional SonarCloud/SonarQube workflow
 - [x] Dockerfile and Docker Compose API profile
 - [x] Security policy, MIT license, changelog, glossary, and portfolio-safety boundary
+- [x] Idempotent GitHub release workflow gated on CI, CodeQL, and Sonar for the exact release SHA
+- [x] Version-matched release notes with an explicit synthetic-data and non-validated-use boundary
 
 ## Post-v1.0 priorities
 
@@ -64,7 +66,7 @@
 - [ ] Add browser-level end-to-end workflow tests
 - [ ] Add accessibility checks and responsive visual regression coverage
 - [ ] Add container image and secret scanning
-- [ ] Add a controlled release workflow with signed provenance and generated release notes
+- [ ] Add signed build provenance, artifact attestations, and optional release assets
 - [ ] Add deployment documentation for a non-regulated demonstration environment
 
 ## Explicit non-goals for this portfolio release
@@ -80,4 +82,5 @@
 3. Attributable actors and server-generated UTC timestamps
 4. Validation at both client and server boundaries
 5. Parameterized database access and controlled errors
-6. Explicit separation between technical demonstration and regulated use
+6. Release tags tied to a gate-verified commit SHA
+7. Explicit separation between technical demonstration and regulated use

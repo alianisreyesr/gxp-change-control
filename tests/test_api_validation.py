@@ -36,6 +36,12 @@ def test_health_ok(client: TestClient):
     changelog = (root / "CHANGELOG.md").read_text(encoding="utf-8")
     assert f"## [{APP_VERSION}]" in changelog
 
+    release_notes = root / "docs" / "releases" / f"v{APP_VERSION}.md"
+    assert release_notes.is_file()
+
+    release_workflow = root / ".github" / "workflows" / "release.yml"
+    assert release_workflow.is_file()
+
 
 def test_create_rejects_shared_actor_with_structured_422(client: TestClient):
     r = client.post(

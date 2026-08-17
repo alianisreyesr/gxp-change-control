@@ -19,16 +19,19 @@ The project follows semantic versioning for public portfolio releases. Version n
 - SQLite schema with synthetic demonstration records
 - Dockerfile and Docker Compose API profile
 - Security policy, glossary, portfolio-safety boundary, and regulatory-reference documentation
+- Version-matched release notes and an idempotent GitHub release workflow
 
 ### Quality and security
 
 - 68 passing pytest tests across eight modules
 - End-to-end API tests for approval, rejection, resubmission, request-for-information, closure, and invalid transitions
+- Release-version consistency checks across FastAPI, the health endpoint, frontend package, Sonar configuration, and changelog
 - TypeScript type checking and Vite production build in CI
 - Bandit, `pip-audit`, and `npm audit` gates
 - CodeQL analysis for Python and JavaScript/TypeScript
 - Credential-aware SonarCloud/SonarQube workflow
 - Non-root API container build
+- Release publication gated on successful CI, CodeQL, and Sonar runs for the exact release SHA
 
 ### Fixed
 
