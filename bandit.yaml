@@ -1,0 +1,20 @@
+# Bandit SAST config — portfolio API (synthetic data only)
+# https://bandit.readthedocs.io/
+
+exclude_dirs:
+  - tests
+  - .venv
+  - venv
+  - frontend
+  - .git
+
+skips: []
+
+# Fail CI on medium and high (and higher)
+# CLI also uses -ll (medium+)
+
+tests:
+  # Keep defaults; explicit list optional
+
+any_other_function_with_shell_equals_true:
+  no_shell: true

@@ -2,36 +2,38 @@
 
 ## Pipeline (GitHub Actions)
 
-Workflow: `.github/workflows/ci.yml`
+### CI — `.github/workflows/ci.yml`
 
 | Job | What |
 |-----|------|
-| **backend** | Python 3.12 · `pytest` + coverage XML artifact |
-| **frontend** | Node 22 · `tsc --noEmit` · `vite build` · dist artifact |
-| **docker** | Build API image (no push) with Buildx + GHA cache |
-| **summary** | Fails if any required job failed |
+| **backend** | Python 3.12 · pytest + coverage |
+| **frontend** | Node 22 · tsc · vite build |
+| **sast** | Bandit · pip-audit · npm audit (see [SAST.md](SAST.md)) |
+| **docker** | Build API image (after backend + sast) |
+| **summary** | Aggregate gate |
 
-Triggers: `push` / `pull_request` to `main`.
+### CodeQL — `.github/workflows/codeql.yml`
 
-## Local equivalents
+Semantic SAST for **python** and **javascript-typescript** (`security-extended`), weekly schedule.
+
+## Local
 
 ```bash
-# Backend
 pip install -r requirements.txt
 pytest tests/ -v --cov=app
 
-# Frontend
-cd frontend && npm install && npx tsc --noEmit && npx vite build
+cd frontend && npm install && npm run build
 
-# Docker API
 docker compose up --build
-# → http://127.0.0.1:8000/health
-# → http://127.0.0.1:8000/docs
+
+# SAST
+pip install bandit[toml] pip-audit
+bandit -r app -c bandit.yaml -ll
+pip-audit -r requirements.txt
 ```
 
-## Design notes (portfolio)
+## Design notes
 
-- No deployment secrets or production registry push (safe default).
-- Image runs as non-root `appuser`.
-- Synthetic SQLite data under `/app/data` volume.
-- Extend later: CD to GHCR on tag, Playwright smoke, coverage gate.
+- No production deploy secrets / registry push by default.
+- Non-root container user.
+- Synthetic data only.
