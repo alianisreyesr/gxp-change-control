@@ -11,11 +11,23 @@ export class ApiError extends Error {
   }
 }
 
+function responseMessage(parsed: unknown, fallback: string): string {
+  if (typeof parsed === "object" && parsed) {
+    const body = parsed as { message?: unknown; detail?: unknown };
+    if (typeof body.message === "string") return body.message;
+    if (typeof body.detail === "string") return body.detail;
+  }
+  if (typeof parsed === "string" && parsed.trim()) return parsed;
+  return fallback;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
-    ...init,
-  });
+  const headers = new Headers(init?.headers);
+  if (init?.body && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  const res = await fetch(`${BASE}${path}`, { ...init, headers });
   if (!res.ok) {
     let parsed: unknown = null;
     const text = await res.text();
@@ -24,14 +36,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     } catch {
       parsed = text;
     }
-    const msg =
-      typeof parsed === "object" &&
-      parsed &&
-      "message" in parsed &&
-      typeof (parsed as { message: unknown }).message === "string"
-        ? (parsed as { message: string }).message
-        : text || res.statusText;
-    throw new ApiError(res.status, parsed, msg);
+    throw new ApiError(res.status, parsed, responseMessage(parsed, res.statusText));
   }
   return res.json() as Promise<T>;
 }
@@ -46,6 +51,7 @@ export type Change = {
   status: string;
   requester: string;
   business_justification?: string | null;
+  target_implementation_date?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -57,6 +63,30 @@ export type Activity = {
   action: string;
   detail?: string | null;
   created_at: string;
+};
+
+export type ImpactAssessment = {
+  id: string;
+  change_id: string;
+  affects_validated_state: boolean;
+  affects_part11_controls: boolean;
+  affects_data_integrity: boolean;
+  affects_training: boolean;
+  affects_sops: boolean;
+  risk_summary: string;
+  residual_risk: "low" | "medium" | "high";
+  assessor: string;
+  assessed_at?: string | null;
+};
+
+export type Approval = {
+  id: string;
+  change_id: string;
+  role: string;
+  decision: "approve" | "reject" | "request_info";
+  comment?: string | null;
+  actor: string;
+  decided_at: string;
 };
 
 /** Map server 422 details → field errors for forms. */
@@ -84,9 +114,16 @@ export const api = {
   submit: (id: string, actor: string) =>
     request<Change>(`/changes/${id}/submit?actor=${encodeURIComponent(actor)}`, { method: "POST" }),
   impact: (id: string, body: Record<string, unknown>) =>
-    request(`/changes/${id}/impact`, { method: "POST", body: JSON.stringify(body) }),
+    request<ImpactAssessment>(`/changes/${id}/impact`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  getImpact: (id: string) => request<ImpactAssessment>(`/changes/${id}/impact`),
   approve: (id: string, body: Record<string, unknown>) =>
-    request(`/changes/${id}/approve`, { method: "POST", body: JSON.stringify(body) }),
+    request<Approval>(`/changes/${id}/approve`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
   advance: (id: string, actor: string) =>
     request<Change>(`/changes/${id}/advance?actor=${encodeURIComponent(actor)}`, { method: "POST" }),
   activity: (id: string) => request<Activity[]>(`/changes/${id}/activity`),
