@@ -3,16 +3,13 @@
 from __future__ import annotations
 
 import re
+from dataclasses import asdict, dataclass
 from datetime import date, datetime, timedelta, timezone
+from enum import Enum
+from typing import Literal, Optional
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-# Calendar date only: YYYY-MM-DD
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-
-# Numeric offset: +hh:mm, -hh:mm, +hhmm, -hhmm (after fromisoformat normalization we use ±hh:mm)
-OFFSET_RE = re.compile(r"^([+-])(\d{2}):(\d{2})$")
-
-# IANA name pattern (optional input style: append |America/Puerto_Rico — see parse docs)
 IANA_RE = re.compile(r"^[A-Za-z_]+(?:/[A-Za-z0-9_+\-]+)+$")
 
 DATETIME_HINT = (
@@ -21,12 +18,42 @@ DATETIME_HINT = (
     "Naive (no zone) values are rejected."
 )
 
-# Civil time offsets in use worldwide roughly span UTC−12 .. UTC+14
 MIN_OFFSET = timedelta(hours=-12)
 MAX_OFFSET = timedelta(hours=14)
 
-# Policy name for logs / OpenAPI descriptions
-TIMEZONE_POLICY = "timezone-aware-required; storage-normalized-to-UTC"
+TIMEZONE_POLICY = (
+    "timezone-aware-required; storage-normalized-to-UTC; "
+    "local-wall-time-requires-fold-when-ambiguous"
+)
+
+
+class WallTimeKind(str, Enum):
+    unique = "unique"
+    ambiguous = "ambiguous"  # fall back — two UTC instants
+    nonexistent = "nonexistent"  # spring forward — gap
+
+
+@dataclass(frozen=True)
+class FoldInstant:
+    fold: Literal[0, 1]
+    utc_iso: str
+    utcoffset_seconds: int
+
+
+@dataclass(frozen=True)
+class WallTimeAnalysis:
+    """Result of analyzing a naive local wall time in an IANA zone."""
+
+    local_iso: str
+    iana_zone: str
+    kind: WallTimeKind
+    message: str
+    instants: tuple[FoldInstant, ...]  # 0, 1, or 2 depending on kind
+
+    def to_dict(self) -> dict:
+        d = asdict(self)
+        d["kind"] = self.kind.value
+        return d
 
 
 def parse_iso_date(value: str) -> date:
@@ -39,8 +66,6 @@ def parse_iso_date(value: str) -> date:
 
 
 def _validate_offset_bounds(tzinfo: timezone | ZoneInfo, when: datetime) -> None:
-    """Reject absurd offsets outside the practical civil range."""
-    # For fixed offsets, utcoffset is constant; for ZoneInfo it depends on `when`
     off = tzinfo.utcoffset(when)
     if off is None:
         raise ValueError("timezone produced no UTC offset")
@@ -52,56 +77,37 @@ def _validate_offset_bounds(tzinfo: timezone | ZoneInfo, when: datetime) -> None
 
 
 def parse_iso_datetime(value: str) -> datetime:
-    """
-    Parse ISO-8601 datetime and **require** timezone awareness.
-
-    Accepted:
-      - ...Z (UTC)
-      - ...+00:00 / ...-04:00 (numeric offsets)
-      - Optional suffix ` IANA` is NOT part of pure ISO; use numeric/Z only for API bodies.
-
-    Rejected:
-      - Naive local timestamps (no offset / Z)
-      - Offsets outside UTC−12 .. UTC+14
-    """
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"invalid date-time; empty. {DATETIME_HINT}")
     raw = value.strip()
-
     if raw.endswith("Z") or raw.endswith("z"):
         raw = raw[:-1] + "+00:00"
-
     try:
         dt = datetime.fromisoformat(raw)
     except ValueError as exc:
         raise ValueError(f"invalid date-time format. {DATETIME_HINT}") from exc
-
     if dt.tzinfo is None:
         raise ValueError(
             "date-time must include a timezone offset or Z (UTC); "
             "naive local timestamps are rejected for audit-style records"
         )
-
     _validate_offset_bounds(dt.tzinfo, dt)
     return dt
 
 
 def to_utc(dt: datetime) -> datetime:
-    """Normalize any aware datetime to UTC."""
     if dt.tzinfo is None:
         raise ValueError("cannot convert naive datetime to UTC")
     return dt.astimezone(timezone.utc)
 
 
 def ensure_iso_datetime_str(value: str) -> str:
-    """Validate, normalize to UTC, return ISO string with +00:00."""
     dt = to_utc(parse_iso_datetime(value))
     return dt.isoformat()
 
 
 def ensure_iso_date_str(value: str) -> str:
-    d = parse_iso_date(value)
-    return d.isoformat()
+    return parse_iso_date(value).isoformat()
 
 
 def utc_now_iso() -> str:
@@ -118,12 +124,6 @@ def assert_target_not_in_past(target: date, *, today: date | None = None) -> Non
 
 
 def validate_iana_zone(name: str) -> ZoneInfo:
-    """
-    Validate an IANA time zone id (e.g. America/Puerto_Rico, UTC).
-
-    Not used on primary API stamps (those use offsets/Z), but available for
-    future UI localization and documentation of zone policy.
-    """
     name = name.strip()
     if name.upper() in {"UTC", "GMT", "Z"}:
         return ZoneInfo("UTC")
@@ -137,40 +137,159 @@ def validate_iana_zone(name: str) -> ZoneInfo:
         raise ValueError(f"unknown IANA time zone: {name}") from exc
 
 
-def convert_local_iso_to_utc(local_iso: str, iana_zone: str) -> str:
-    """
-    Interpret a *naive* ISO local wall time in a named zone and return UTC ISO.
-
-    Educational helper: demonstrates why the API rejects naive stamps without zone context.
-    """
+def _parse_naive_local(local_iso: str) -> datetime:
     if not isinstance(local_iso, str) or not local_iso.strip():
         raise ValueError("local_iso is required")
     raw = local_iso.strip()
-    if raw.endswith("Z") or re.search(r"[+-]\d{2}:\d{2}$", raw):
-        raise ValueError("local_iso must be naive wall time; use parse_iso_datetime for aware values")
+    if raw.endswith("Z") or raw.endswith("z") or re.search(r"[+-]\d{2}:\d{2}$", raw):
+        raise ValueError(
+            "local_iso must be naive wall time (no Z/offset); "
+            "use parse_iso_datetime for aware API stamps"
+        )
     try:
         naive = datetime.fromisoformat(raw)
     except ValueError as exc:
         raise ValueError("invalid local ISO datetime") from exc
     if naive.tzinfo is not None:
         raise ValueError("local_iso must not already include a timezone offset")
+    return naive
+
+
+def _civil_tuple(dt: datetime) -> tuple[int, int, int, int, int, int, int]:
+    return (dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, dt.microsecond)
+
+
+def _fold_instant(naive: datetime, zi: ZoneInfo, fold: Literal[0, 1]) -> FoldInstant | None:
+    """
+    Attach fold and verify the wall time is a real civil time in this zone.
+
+    Returns None if this fold does not correspond to a real local wall time
+    (typical for the gap during spring-forward).
+    """
+    aware = naive.replace(tzinfo=zi, fold=fold)
+    # Round-trip: UTC → zone should reproduce the same civil fields
+    back = aware.astimezone(zi)
+    if _civil_tuple(back.replace(tzinfo=None)) != _civil_tuple(naive):
+        return None
+    # For ambiguous times both folds are real but offsets differ; for unique they match.
+    off = aware.utcoffset()
+    if off is None:
+        return None
+    utc = to_utc(aware)
+    return FoldInstant(
+        fold=fold,
+        utc_iso=utc.isoformat(),
+        utcoffset_seconds=int(off.total_seconds()),
+    )
+
+
+def analyze_wall_time(local_iso: str, iana_zone: str) -> WallTimeAnalysis:
+    """
+    Classify a naive local wall time in an IANA zone (PEP 495 fold).
+
+    - **unique**: one UTC instant (fold 0 and 1 agree, or only one valid)
+    - **ambiguous**: fall-back overlap — two UTC instants (fold=0 vs fold=1)
+    - **nonexistent**: spring-forward gap — no valid fold
+    """
+    naive = _parse_naive_local(local_iso)
     zi = validate_iana_zone(iana_zone)
-    aware = naive.replace(tzinfo=zi)
-    _validate_offset_bounds(zi, aware)
-    return to_utc(aware).isoformat()
+    local_norm = naive.isoformat(sep="T")
+
+    f0 = _fold_instant(naive, zi, 0)
+    f1 = _fold_instant(naive, zi, 1)
+
+    if f0 is None and f1 is None:
+        return WallTimeAnalysis(
+            local_iso=local_norm,
+            iana_zone=iana_zone,
+            kind=WallTimeKind.nonexistent,
+            message=(
+                f"Local time {local_norm} does not exist in {iana_zone} "
+                f"(DST spring-forward gap). Use a different local time or send UTC."
+            ),
+            instants=(),
+        )
+
+    # Both folds valid with different UTC → ambiguous
+    if f0 is not None and f1 is not None and f0.utc_iso != f1.utc_iso:
+        return WallTimeAnalysis(
+            local_iso=local_norm,
+            iana_zone=iana_zone,
+            kind=WallTimeKind.ambiguous,
+            message=(
+                f"Local time {local_norm} is ambiguous in {iana_zone} "
+                f"(DST fall-back). Specify fold=0 (first occurrence) or fold=1 "
+                f"(second occurrence), or send an aware UTC timestamp."
+            ),
+            instants=(f0, f1),
+        )
+
+    chosen = f0 or f1
+    assert chosen is not None
+    return WallTimeAnalysis(
+        local_iso=local_norm,
+        iana_zone=iana_zone,
+        kind=WallTimeKind.unique,
+        message=f"Local time {local_norm} maps to a single UTC instant in {iana_zone}.",
+        instants=(chosen,),
+    )
+
+
+def convert_local_iso_to_utc(
+    local_iso: str,
+    iana_zone: str,
+    *,
+    fold: Optional[Literal[0, 1]] = None,
+) -> str:
+    """
+    Convert naive local wall time + IANA zone → UTC ISO.
+
+    - unique → converts without fold
+    - nonexistent → ValueError
+    - ambiguous → requires explicit fold=0 or fold=1
+    """
+    analysis = analyze_wall_time(local_iso, iana_zone)
+
+    if analysis.kind is WallTimeKind.nonexistent:
+        raise ValueError(analysis.message)
+
+    if analysis.kind is WallTimeKind.ambiguous:
+        if fold is None:
+            raise ValueError(analysis.message)
+        for inst in analysis.instants:
+            if inst.fold == fold:
+                return inst.utc_iso
+        raise ValueError(f"fold must be 0 or 1; got {fold}")
+
+    # unique
+    if fold is not None and analysis.instants and analysis.instants[0].fold != fold:
+        # Allow caller to pass fold=0 on unique times; ignore mismatch if only one instant
+        pass
+    return analysis.instants[0].utc_iso
 
 
 def timezone_policy_info() -> dict:
     return {
         "policy": TIMEZONE_POLICY,
         "accepted_on_api": ["ISO-8601 with Z", "ISO-8601 with numeric offset ±hh:mm"],
-        "rejected": ["naive date-time", "US slash dates", "offsets outside UTC-12..UTC+14"],
+        "rejected": [
+            "naive date-time on primary stamps",
+            "US slash dates",
+            "offsets outside UTC-12..UTC+14",
+            "ambiguous local wall time without fold",
+            "nonexistent local wall time (DST gap)",
+        ],
         "storage": "UTC (normalized on write/validate)",
         "date_only": "YYYY-MM-DD (no timezone; calendar date)",
-        "iana_helper": "validate_iana_zone / convert_local_iso_to_utc for UI localization demos",
+        "dst": {
+            "fold": "PEP 495 — fold=0 first occurrence, fold=1 second during fall-back",
+            "analyze": "GET/POST helpers under /meta/timezone/",
+            "note": "America/Puerto_Rico has no DST; use America/New_York to demo gaps/ambiguity",
+        },
         "examples": {
             "utc_z": "2026-08-17T12:00:00Z",
-            "utc_offset": "2026-08-17T12:00:00+00:00",
             "puerto_rico_ast": "2026-08-17T08:00:00-04:00",
+            "nyc_ambiguous_local": "2025-11-02T01:30:00 + America/New_York",
+            "nyc_gap_local": "2025-03-09T02:30:00 + America/New_York",
         },
     }
