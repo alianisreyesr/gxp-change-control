@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GxP Change Control — schema index",
+  "description": "Static copies for review. Runtime source of truth remains Pydantic models; refresh via scripts/export_json_schemas.py.",
+  "dialect": "https://json-schema.org/draft/2020-12/schema",
+  "schemas": {
+    "change-create": "change-create.json",
+    "impact-assessment-in": "impact-assessment-in.json",
+    "approval-in": "approval-in.json"
+  },
+  "api": {
+    "catalog": "GET /schemas",
+    "one": "GET /schemas/{name}",
+    "bundle": "GET /schemas/export/all"
+  }
+}

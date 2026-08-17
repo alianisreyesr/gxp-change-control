@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://alianisreyesr.github.io/gxp-change-control/schemas/impact-assessment-in.json",
+  "title": "ImpactAssessmentIn",
+  "description": "JSON Schema for ImpactAssessmentIn (generated from Pydantic). Portfolio synthetic API only.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "affects_validated_state": { "type": "boolean", "default": false },
+    "affects_part11_controls": { "type": "boolean", "default": false },
+    "affects_data_integrity": { "type": "boolean", "default": false },
+    "affects_training": { "type": "boolean", "default": false },
+    "affects_sops": { "type": "boolean", "default": false },
+    "risk_summary": { "type": "string", "minLength": 20, "maxLength": 4000 },
+    "residual_risk": {
+      "type": "string",
+      "enum": ["low", "medium", "high"],
+      "default": "low"
+    },
+    "assessor": { "type": "string", "minLength": 2, "maxLength": 80 }
+  },
+  "required": ["risk_summary", "assessor"],
+  "allOf": [
+    {
+      "if": {
+        "properties": { "residual_risk": { "const": "high" } },
+        "required": ["residual_risk"]
+      },
+      "then": {
+        "properties": {
+          "risk_summary": { "type": "string", "minLength": 40, "maxLength": 4000 }
+        }
+      }
+    }
+  ],
+  "x-gxp-notes": {
+    "cross_field": "Three or more impact flags + residual_risk=low requires risk_summary >= 60 chars (Pydantic model_validator)"
+  }
+}

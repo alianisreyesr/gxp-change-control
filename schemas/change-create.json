@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://alianisreyesr.github.io/gxp-change-control/schemas/change-create.json",
+  "title": "ChangeCreate",
+  "description": "JSON Schema for ChangeCreate (generated from Pydantic). Portfolio synthetic API only.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "title": {
+      "type": "string",
+      "minLength": 5,
+      "maxLength": 200,
+      "description": "Short, specific change title",
+      "examples": ["Update audit-log retention label in UI"]
+    },
+    "description": {
+      "type": "string",
+      "minLength": 20,
+      "maxLength": 4000,
+      "description": "What will change and what will not"
+    },
+    "system_name": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 200
+    },
+    "change_type": {
+      "type": "string",
+      "enum": ["configuration", "code", "process", "infrastructure", "documentation"]
+    },
+    "priority": {
+      "type": "string",
+      "enum": ["low", "medium", "high", "critical"],
+      "default": "medium"
+    },
+    "requester": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 80,
+      "description": "Attributable person id (not shared accounts such as admin/user)"
+    },
+    "business_justification": {
+      "anyOf": [
+        { "type": "string", "maxLength": 2000 },
+        { "type": "null" }
+      ],
+      "default": null
+    }
+  },
+  "required": ["title", "description", "system_name", "change_type", "requester"],
+  "x-gxp-notes": {
+    "cross_field": "priority high|critical requires business_justification >= 15 chars (enforced in Pydantic model_validator; not expressible in pure JSON Schema alone)",
+    "actor_policy": "Shared-style ids rejected at runtime"
+  }
+}
