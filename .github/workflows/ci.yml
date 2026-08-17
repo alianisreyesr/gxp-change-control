@@ -95,7 +95,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install bandit[toml] pip-audit
+          pip install "bandit[toml]" pip-audit
 
       - name: Bandit (Python SAST)
         run: |
@@ -116,7 +116,7 @@ jobs:
       - name: npm audit (frontend dependencies)
         working-directory: frontend
         run: |
-          npm install --package-lock-only
+          npm install
           npm audit --audit-level=high
 
       - name: Upload Bandit report
