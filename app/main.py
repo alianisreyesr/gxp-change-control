@@ -11,6 +11,8 @@ from app.database import init_db
 from app.models import ErrorDetail, HealthOut, ValidationErrorBody
 from app.routers import changes, meta, schemas
 
+APP_VERSION = "1.0.0"
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -27,7 +29,7 @@ app = FastAPI(
         "**timezone policy** at `/meta/timezone-policy` (aware ISO required, storage UTC). "
         "Invalid input → HTTP **422**."
     ),
-    version="0.1.3",
+    version=APP_VERSION,
     lifespan=lifespan,
 )
 
@@ -70,5 +72,5 @@ def health():
         status="ok",
         service="gxp-change-control",
         data_classification="synthetic-portfolio-only",
-        version="0.1.3",
+        version=APP_VERSION,
     )
