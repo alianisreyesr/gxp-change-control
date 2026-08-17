@@ -1,19 +1,27 @@
 """FastAPI + Pydantic integration tests (422 contract)."""
 
+import pytest
 from fastapi.testclient import TestClient
 
+from app import database
 from app.main import app
 
-client = TestClient(app)
+
+@pytest.fixture()
+def client(tmp_path, monkeypatch):
+    """Run each API test against an isolated database with app lifespan enabled."""
+    monkeypatch.setattr(database, "DB_PATH", tmp_path / "change_control.db")
+    with TestClient(app) as test_client:
+        yield test_client
 
 
-def test_health_ok():
+def test_health_ok(client: TestClient):
     r = client.get("/health")
     assert r.status_code == 200
     assert r.json()["data_classification"] == "synthetic-portfolio-only"
 
 
-def test_create_rejects_shared_actor_with_structured_422():
+def test_create_rejects_shared_actor_with_structured_422(client: TestClient):
     r = client.post(
         "/changes",
         json={
@@ -32,7 +40,7 @@ def test_create_rejects_shared_actor_with_structured_422():
     assert any("actor" in d["msg"].lower() or "admin" in d["msg"].lower() for d in body["details"])
 
 
-def test_create_rejects_extra_fields():
+def test_create_rejects_extra_fields(client: TestClient):
     r = client.post(
         "/changes",
         json={
@@ -48,7 +56,7 @@ def test_create_rejects_extra_fields():
     assert r.status_code == 422
 
 
-def test_create_accepts_valid_payload():
+def test_create_accepts_valid_payload(client: TestClient):
     r = client.post(
         "/changes",
         json={
@@ -64,17 +72,17 @@ def test_create_accepts_valid_payload():
     assert r.json()["id"].startswith("CHG-")
 
 
-def test_invalid_change_id_path_returns_422():
+def test_invalid_change_id_path_returns_422(client: TestClient):
     r = client.get("/changes/not-a-valid-id")
     assert r.status_code == 422
 
 
-def test_invalid_status_filter_returns_422():
+def test_invalid_status_filter_returns_422(client: TestClient):
     r = client.get("/changes?status=not_a_status")
     assert r.status_code == 422
 
 
-def test_submit_rejects_forbidden_actor_query():
+def test_submit_rejects_forbidden_actor_query(client: TestClient):
     # Use a known seed id that exists after init
     r = client.post("/changes/CHG-1001/submit?actor=admin")
     assert r.status_code == 422

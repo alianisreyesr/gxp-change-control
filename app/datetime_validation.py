@@ -167,8 +167,9 @@ def _fold_instant(naive: datetime, zi: ZoneInfo, fold: Literal[0, 1]) -> FoldIns
     (typical for the gap during spring-forward).
     """
     aware = naive.replace(tzinfo=zi, fold=fold)
-    # Round-trip: UTC → zone should reproduce the same civil fields
-    back = aware.astimezone(zi)
+    # A same-zone conversion is a no-op. Round-trip through UTC so ZoneInfo
+    # normalizes gaps and overlaps before comparing the civil fields.
+    back = aware.astimezone(timezone.utc).astimezone(zi)
     if _civil_tuple(back.replace(tzinfo=None)) != _civil_tuple(naive):
         return None
     # For ambiguous times both folds are real but offsets differ; for unique they match.
@@ -225,7 +226,8 @@ def analyze_wall_time(local_iso: str, iana_zone: str) -> WallTimeAnalysis:
         )
 
     chosen = f0 or f1
-    assert chosen is not None
+    if chosen is None:
+        raise RuntimeError("wall-time analysis reached an invalid state")
     return WallTimeAnalysis(
         local_iso=local_norm,
         iana_zone=iana_zone,
