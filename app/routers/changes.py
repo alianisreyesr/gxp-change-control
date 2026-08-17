@@ -224,7 +224,7 @@ def advance(change_id: str, actor: str = Query(..., min_length=2)):
         nxt = transitions[cur]
         conn.execute(
             "UPDATE changes SET status = ?, updated_at = ? WHERE id = ?",
-            (_now(), change_id),
+            (nxt, _now(), change_id),
         )
         _log(conn, change_id, actor, "advanced", f"{cur} → {nxt}")
         row = conn.execute("SELECT * FROM changes WHERE id = ?", (change_id,)).fetchone()
