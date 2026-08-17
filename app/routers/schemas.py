@@ -22,6 +22,12 @@ def list_schemas():
     }
 
 
+@router.get("/export/all")
+def export_all():
+    """Bundle all schemas (useful for codegen or offline packs)."""
+    return build_all()
+
+
 @router.get("/{name}")
 def get_schema(name: str):
     """Return a single JSON Schema document."""
@@ -37,9 +43,3 @@ def get_schema(name: str):
         media_type="application/schema+json",
         headers={"Cache-Control": "public, max-age=300"},
     )
-
-
-@router.get("/export/all")
-def export_all():
-    """Bundle all schemas (useful for codegen or offline packs)."""
-    return build_all()
