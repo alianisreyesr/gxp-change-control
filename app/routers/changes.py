@@ -11,10 +11,12 @@ from app.models import (
     ApprovalIn,
     ApprovalOut,
     ActivityOut,
+    ActorQuery,
     ChangeCreate,
     ChangeOut,
     ImpactAssessmentIn,
     ImpactAssessmentOut,
+    Status,
 )
 
 router = APIRouter(prefix="/changes", tags=["changes"])
@@ -35,12 +37,24 @@ def _log(conn, change_id: str, actor: str, action: str, detail: str = "") -> Non
     )
 
 
+def _validated_actor(actor: str) -> str:
+    """Validate actor query params with the same rules as body fields."""
+    return ActorQuery(actor=actor).actor
+
+
 @router.get("", response_model=list[ChangeOut])
-def list_changes(status: Optional[str] = Query(default=None)):
+def list_changes(
+    status: Optional[Status] = Query(
+        default=None,
+        description="Filter by workflow status",
+    ),
+):
     with get_conn() as conn:
-        if status:
+        if status is not None:
+            status_val = status.value if isinstance(status, Status) else status
             rows = conn.execute(
-                "SELECT * FROM changes WHERE status = ? ORDER BY updated_at DESC", (status,)
+                "SELECT * FROM changes WHERE status = ? ORDER BY updated_at DESC",
+                (status_val,),
             ).fetchall()
         else:
             rows = conn.execute("SELECT * FROM changes ORDER BY updated_at DESC").fetchall()
@@ -51,6 +65,8 @@ def list_changes(status: Optional[str] = Query(default=None)):
 def create_change(body: ChangeCreate):
     cid = f"CHG-{uuid.uuid4().hex[:6].upper()}"
     ts = _now()
+    change_type = body.change_type.value if hasattr(body.change_type, "value") else body.change_type
+    priority = body.priority.value if hasattr(body.priority, "value") else body.priority
     with get_conn() as conn:
         conn.execute(
             """
@@ -64,8 +80,8 @@ def create_change(body: ChangeCreate):
                 body.title,
                 body.description,
                 body.system_name,
-                body.change_type,
-                body.priority,
+                change_type,
+                priority,
                 body.requester,
                 body.business_justification,
                 ts,
@@ -87,7 +103,11 @@ def get_change(change_id: str):
 
 
 @router.post("/{change_id}/submit", response_model=ChangeOut)
-def submit_change(change_id: str, actor: str = Query(..., min_length=2)):
+def submit_change(
+    change_id: str,
+    actor: str = Query(..., min_length=2, max_length=80, description="Attributable person id"),
+):
+    actor = _validated_actor(actor)
     with get_conn() as conn:
         row = conn.execute("SELECT * FROM changes WHERE id = ?", (change_id,)).fetchone()
         if not row:
@@ -105,6 +125,7 @@ def submit_change(change_id: str, actor: str = Query(..., min_length=2)):
 
 @router.post("/{change_id}/impact", response_model=ImpactAssessmentOut)
 def record_impact(change_id: str, body: ImpactAssessmentIn):
+    residual = body.residual_risk.value if hasattr(body.residual_risk, "value") else body.residual_risk
     with get_conn() as conn:
         row = conn.execute("SELECT * FROM changes WHERE id = ?", (change_id,)).fetchone()
         if not row:
@@ -131,7 +152,7 @@ def record_impact(change_id: str, body: ImpactAssessmentIn):
                 int(body.affects_training),
                 int(body.affects_sops),
                 body.risk_summary,
-                body.residual_risk,
+                residual,
                 body.assessor,
                 ts,
             ),
@@ -176,6 +197,7 @@ def get_impact(change_id: str):
 
 @router.post("/{change_id}/approve", response_model=ApprovalOut)
 def approve_change(change_id: str, body: ApprovalIn):
+    decision = body.decision.value if hasattr(body.decision, "value") else body.decision
     with get_conn() as conn:
         row = conn.execute("SELECT * FROM changes WHERE id = ?", (change_id,)).fetchone()
         if not row:
@@ -189,11 +211,11 @@ def approve_change(change_id: str, body: ApprovalIn):
             INSERT INTO approvals (id, change_id, role, decision, comment, actor, decided_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (aid, change_id, body.role, body.decision, body.comment, body.actor, ts),
+            (aid, change_id, body.role, decision, body.comment, body.actor, ts),
         )
-        if body.decision == "approve":
+        if decision == "approve":
             new_status = "approved"
-        elif body.decision == "reject":
+        elif decision == "reject":
             new_status = "rejected"
         else:
             new_status = "impact_assessment"
@@ -201,14 +223,18 @@ def approve_change(change_id: str, body: ApprovalIn):
             "UPDATE changes SET status = ?, updated_at = ? WHERE id = ?",
             (new_status, ts, change_id),
         )
-        _log(conn, change_id, body.actor, f"decision:{body.decision}", body.comment or "")
+        _log(conn, change_id, body.actor, f"decision:{decision}", body.comment or "")
         apr = conn.execute("SELECT * FROM approvals WHERE id = ?", (aid,)).fetchone()
     return ApprovalOut(**dict(apr))
 
 
 @router.post("/{change_id}/advance", response_model=ChangeOut)
-def advance(change_id: str, actor: str = Query(..., min_length=2)):
+def advance(
+    change_id: str,
+    actor: str = Query(..., min_length=2, max_length=80, description="Attributable person id"),
+):
     """Move approved → implementing → verification → closed."""
+    actor = _validated_actor(actor)
     transitions = {
         "approved": "implementing",
         "implementing": "verification",
