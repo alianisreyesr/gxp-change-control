@@ -33,6 +33,22 @@ The Sonar workflow is credential-aware:
 
 Repository variables can override the Sonar host, project key, and organization. See [SONARQUBE.md](SONARQUBE.md).
 
+## Controlled release — `.github/workflows/release.yml`
+
+The release workflow is intentionally idempotent and release-commit driven:
+
+1. A candidate commit on `main` must use a subject beginning with `release:`.
+2. The workflow inspects GitHub Actions runs for that exact commit SHA.
+3. `CI`, `CodeQL`, and `SonarQube / SonarCloud` must all be completed successfully.
+4. The application version is read from `APP_VERSION` in `app/main.py`.
+5. A matching notes file must exist at `docs/releases/v<version>.md`.
+6. GitHub CLI creates the tag and release at the verified SHA using the workflow's scoped `GITHUB_TOKEN`.
+7. Existing releases are detected and left unchanged, so repeated workflow events are safe.
+
+The workflow listens to `push`, `workflow_run`, and manual-dispatch events. Early events exit without publishing while another required workflow is still running; a later completion event reevaluates the same SHA.
+
+Permissions are limited to read access for Actions metadata and write access for repository contents, which GitHub requires to create the tag and release.
+
 ## Local verification
 
 ```bash
@@ -59,17 +75,21 @@ docker compose build
 
 ## Release evidence
 
-Before creating a release tag:
+Before publishing a release tag:
 
-1. all required CI jobs on the release commit should be successful;
-2. CodeQL should complete for both language matrices;
-3. Sonar execution or credential-aware skip should be documented accurately;
-4. application, frontend, Sonar, changelog, and release versions should agree;
-5. the release notes should restate the synthetic-data and non-validated-use boundary.
+1. all required CI jobs on the release commit must be successful;
+2. CodeQL must complete for both language matrices;
+3. Sonar execution or credential-aware skip must complete successfully;
+4. application, frontend, Sonar, changelog, and release versions must agree;
+5. a version-matched release-notes file must restate the synthetic-data and non-validated-use boundary;
+6. the resulting GitHub release must target the exact SHA evaluated by the gates.
+
+The existing health test enforces version agreement across the API, frontend package, Sonar project configuration, and changelog.
 
 ## Design notes
 
 - No registry push or production deployment occurs by default.
 - The runtime image uses a non-root user.
 - The Compose profile persists only synthetic demonstration data.
-- CI evidence demonstrates software-engineering discipline; it is not an approved validation package.
+- The release is a portfolio software baseline, not an approved validation package.
+- CI evidence demonstrates software-engineering discipline; it does not establish regulatory compliance or validated status.
