@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException
 
 from app.database import get_conn
+from app.datetime_validation import utc_now_iso
 from app.deps import ActorParam, ChangeIdPath, StatusFilter
 from app.models import (
     ApprovalIn,
@@ -20,18 +20,17 @@ from app.models import (
 router = APIRouter(prefix="/changes", tags=["changes"])
 
 
-def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-
 def _row_change(row) -> ChangeOut:
-    return ChangeOut(**dict(row))
+    data = dict(row)
+    if "target_implementation_date" not in data:
+        data["target_implementation_date"] = None
+    return ChangeOut(**data)
 
 
 def _log(conn, change_id: str, actor: str, action: str, detail: str = "") -> None:
     conn.execute(
         "INSERT INTO activity_log (change_id, actor, action, detail, created_at) VALUES (?, ?, ?, ?, ?)",
-        (change_id, actor, action, detail, _now()),
+        (change_id, actor, action, detail, utc_now_iso()),
     )
 
 
@@ -49,36 +48,10 @@ def list_changes(status: StatusFilter = None):
     return [_row_change(r) for r in rows]
 
 
-@router.post(
-    "",
-    response_model=ChangeOut,
-    status_code=201,
-    summary="Create change request",
-    responses={
-        422: {
-            "description": "Pydantic validation failed",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "error": "validation_error",
-                        "message": "Request failed Pydantic / FastAPI validation",
-                        "details": [
-                            {
-                                "loc": ["body", "requester"],
-                                "msg": "'admin' is not allowed as an attributable actor",
-                                "type": "value_error",
-                            }
-                        ],
-                    }
-                }
-            },
-        }
-    },
-)
+@router.post("", response_model=ChangeOut, status_code=201)
 def create_change(body: ChangeCreate):
-    """Body validated by **ChangeCreate** (enums, actor policy, priority rules)."""
     cid = f"CHG-{uuid.uuid4().hex[:6].upper()}"
-    ts = _now()
+    ts = utc_now_iso()
     change_type = body.change_type.value if hasattr(body.change_type, "value") else body.change_type
     priority = body.priority.value if hasattr(body.priority, "value") else body.priority
     with get_conn() as conn:
@@ -86,8 +59,8 @@ def create_change(body: ChangeCreate):
             """
             INSERT INTO changes (
               id, title, description, system_name, change_type, priority, status,
-              requester, business_justification, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?)
+              requester, business_justification, target_implementation_date, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?)
             """,
             (
                 cid,
@@ -98,6 +71,7 @@ def create_change(body: ChangeCreate):
                 priority,
                 body.requester,
                 body.business_justification,
+                body.target_implementation_date,
                 ts,
                 ts,
             ),
@@ -126,7 +100,7 @@ def submit_change(change_id: ChangeIdPath, actor: ActorParam):
             raise HTTPException(400, f"Cannot submit from status={row['status']}")
         conn.execute(
             "UPDATE changes SET status = 'impact_assessment', updated_at = ? WHERE id = ?",
-            (_now(), change_id),
+            (utc_now_iso(), change_id),
         )
         _log(conn, change_id, actor, "submitted", "Submitted for impact assessment")
         row = conn.execute("SELECT * FROM changes WHERE id = ?", (change_id,)).fetchone()
@@ -143,7 +117,7 @@ def record_impact(change_id: ChangeIdPath, body: ImpactAssessmentIn):
         if row["status"] not in ("impact_assessment", "submitted"):
             raise HTTPException(400, f"Cannot assess impact from status={row['status']}")
         ia_id = f"IA-{uuid.uuid4().hex[:6].upper()}"
-        ts = _now()
+        ts = utc_now_iso()
         conn.execute("DELETE FROM impact_assessments WHERE change_id = ?", (change_id,))
         conn.execute(
             """
@@ -215,7 +189,7 @@ def approve_change(change_id: ChangeIdPath, body: ApprovalIn):
         if row["status"] != "pending_approval":
             raise HTTPException(400, f"Cannot decide from status={row['status']}")
         aid = f"APR-{uuid.uuid4().hex[:6].upper()}"
-        ts = _now()
+        ts = utc_now_iso()
         conn.execute(
             """
             INSERT INTO approvals (id, change_id, role, decision, comment, actor, decided_at)
@@ -240,7 +214,6 @@ def approve_change(change_id: ChangeIdPath, body: ApprovalIn):
 
 @router.post("/{change_id}/advance", response_model=ChangeOut)
 def advance(change_id: ChangeIdPath, actor: ActorParam):
-    """Move approved → implementing → verification → closed."""
     transitions = {
         "approved": "implementing",
         "implementing": "verification",
@@ -256,7 +229,7 @@ def advance(change_id: ChangeIdPath, actor: ActorParam):
         nxt = transitions[cur]
         conn.execute(
             "UPDATE changes SET status = ?, updated_at = ? WHERE id = ?",
-            (nxt, _now(), change_id),
+            (nxt, utc_now_iso(), change_id),
         )
         _log(conn, change_id, actor, "advanced", f"{cur} → {nxt}")
         row = conn.execute("SELECT * FROM changes WHERE id = ?", (change_id,)).fetchone()

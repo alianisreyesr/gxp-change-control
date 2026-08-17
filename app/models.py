@@ -14,6 +14,13 @@ from pydantic import (
     model_validator,
 )
 
+from app.datetime_validation import (
+    assert_target_not_in_past,
+    ensure_iso_date_str,
+    ensure_iso_datetime_str,
+    parse_iso_date,
+)
+
 
 class ChangeType(str, Enum):
     configuration = "configuration"
@@ -107,10 +114,28 @@ PersonId = Annotated[
     AfterValidator(_normalize_person),
 ]
 
+# JSON Schema: format date / date-time (Ajv + OpenAPI)
+IsoDate = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=10, max_length=10, pattern=r"^\d{4}-\d{2}-\d{2}$"),
+    AfterValidator(ensure_iso_date_str),
+    Field(json_schema_extra={"format": "date", "examples": ["2026-09-01"]}),
+]
+
+IsoDateTime = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=20, max_length=40),
+    AfterValidator(ensure_iso_datetime_str),
+    Field(
+        json_schema_extra={
+            "format": "date-time",
+            "examples": ["2026-08-17T12:00:00+00:00", "2026-08-17T12:00:00Z"],
+        }
+    ),
+]
+
 
 class PortfolioModel(BaseModel):
-    """Base config: strip strings, forbid extra fields, use enum values in JSON."""
-
     model_config = ConfigDict(
         str_strip_whitespace=True,
         extra="forbid",
@@ -136,6 +161,10 @@ class ChangeCreate(PortfolioModel):
     priority: Priority = Priority.medium
     requester: PersonId
     business_justification: Optional[str] = Field(default=None, max_length=2000)
+    target_implementation_date: Optional[IsoDate] = Field(
+        default=None,
+        description="Planned implementation calendar date (YYYY-MM-DD, not in the past)",
+    )
 
     @field_validator("title", "description", "system_name", "business_justification", mode="before")
     @classmethod
@@ -157,13 +186,23 @@ class ChangeCreate(PortfolioModel):
             raise ValueError("title looks like a placeholder; provide a meaningful title")
         return v
 
+    @field_validator("target_implementation_date", mode="before")
+    @classmethod
+    def empty_date_to_none(cls, v):
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return None
+        return v
+
     @model_validator(mode="after")
-    def priority_requires_justification(self):
+    def priority_and_dates(self):
         if self.priority in (Priority.high, Priority.critical, "high", "critical"):
             if not self.business_justification or len(self.business_justification.strip()) < 15:
                 raise ValueError(
                     "business_justification (min 15 chars) is required when priority is high or critical"
                 )
+        if self.target_implementation_date:
+            d = parse_iso_date(self.target_implementation_date)
+            assert_target_not_in_past(d)
         return self
 
 
@@ -177,8 +216,19 @@ class ChangeOut(PortfolioModel):
     status: Status
     requester: str
     business_justification: Optional[str] = None
-    created_at: str
-    updated_at: str
+    target_implementation_date: Optional[str] = Field(
+        default=None,
+        json_schema_extra={"format": "date"},
+    )
+    created_at: IsoDateTime
+    updated_at: IsoDateTime
+
+    @field_validator("target_implementation_date", mode="before")
+    @classmethod
+    def optional_date(cls, v):
+        if v is None or v == "":
+            return None
+        return ensure_iso_date_str(str(v))
 
 
 class ImpactAssessmentIn(PortfolioModel):
@@ -217,7 +267,7 @@ class ImpactAssessmentIn(PortfolioModel):
 class ImpactAssessmentOut(ImpactAssessmentIn):
     id: str
     change_id: ChangeIdStr
-    assessed_at: Optional[str] = None
+    assessed_at: Optional[IsoDateTime] = None
 
 
 class ApprovalIn(PortfolioModel):
@@ -248,7 +298,7 @@ class ApprovalIn(PortfolioModel):
 class ApprovalOut(ApprovalIn):
     id: str
     change_id: ChangeIdStr
-    decided_at: str
+    decided_at: IsoDateTime
 
 
 class ActivityOut(PortfolioModel):
@@ -257,7 +307,7 @@ class ActivityOut(PortfolioModel):
     actor: str
     action: str = Field(min_length=1, max_length=120)
     detail: Optional[str] = None
-    created_at: str
+    created_at: IsoDateTime
 
 
 class ActorQuery(PortfolioModel):
@@ -265,16 +315,12 @@ class ActorQuery(PortfolioModel):
 
 
 class ErrorDetail(PortfolioModel):
-    """Single field error in API validation responses."""
-
     loc: list[str | int]
     msg: str
     type: str
 
 
 class ValidationErrorBody(PortfolioModel):
-    """Stable shape for 422 responses (portfolio / client-friendly)."""
-
     error: str = "validation_error"
     message: str = "Request failed Pydantic / FastAPI validation"
     details: list[ErrorDetail]

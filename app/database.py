@@ -30,19 +30,26 @@ def get_conn():
         conn.close()
 
 
+def _migrate(conn: sqlite3.Connection) -> None:
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(changes)").fetchall()}
+    if "target_implementation_date" not in cols:
+        conn.execute("ALTER TABLE changes ADD COLUMN target_implementation_date TEXT")
+
+
 def init_db() -> None:
     schema = SCHEMA_PATH.read_text(encoding="utf-8")
     with get_conn() as conn:
         conn.executescript(schema)
+        _migrate(conn)
         count = conn.execute("SELECT COUNT(*) AS c FROM changes").fetchone()["c"]
         if count == 0:
             _seed(conn)
 
 
 def _seed(conn: sqlite3.Connection) -> None:
-    from datetime import datetime, timezone
+    from app.datetime_validation import utc_now_iso
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = utc_now_iso()
     samples = [
         (
             "CHG-1001",
@@ -54,6 +61,7 @@ def _seed(conn: sqlite3.Connection) -> None:
             "impact_assessment",
             "a.reyes",
             "Inspector-facing terminology consistency.",
+            "2026-09-15",
             now,
             now,
         ),
@@ -67,6 +75,7 @@ def _seed(conn: sqlite3.Connection) -> None:
             "pending_approval",
             "j.martinez",
             "Improve client diagnostics without changing authorization model.",
+            None,
             now,
             now,
         ),
@@ -80,6 +89,7 @@ def _seed(conn: sqlite3.Connection) -> None:
             "closed",
             "a.reyes",
             "Keep demo data clearly fictional and current.",
+            "2026-08-01",
             now,
             now,
         ),
@@ -88,8 +98,8 @@ def _seed(conn: sqlite3.Connection) -> None:
         """
         INSERT INTO changes (
           id, title, description, system_name, change_type, priority, status,
-          requester, business_justification, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          requester, business_justification, target_implementation_date, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         samples,
     )

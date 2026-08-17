@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS changes (
   )),
   requester TEXT NOT NULL,
   business_justification TEXT,
+  target_implementation_date TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
