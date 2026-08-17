@@ -20,6 +20,7 @@ export default function NewChange() {
     priority: "medium",
     requester: "a.reyes",
     business_justification: "",
+    target_implementation_date: "",
   });
 
   const mutation = useMutation({
@@ -57,8 +58,8 @@ export default function NewChange() {
       <div>
         <h1 className="text-2xl font-semibold text-brand-900">New change request</h1>
         <p className="text-sm text-slate-600">
-          Client-side validation via <strong>Ajv</strong> + JSON Schema (<code className="text-xs">change-create</code>
-          ), then server-side Pydantic.
+          Ajv + JSON Schema (<code className="text-xs">format: date</code>) then Pydantic ISO checks on the
+          server.
         </p>
       </div>
 
@@ -132,6 +133,19 @@ export default function NewChange() {
             <FieldError messages={fieldErrors.priority} />
           </label>
         </div>
+
+        <label className="block text-sm">
+          <span className="mb-1 block font-medium text-slate-700">
+            target implementation date <span className="font-normal text-slate-500">(YYYY-MM-DD, optional)</span>
+          </span>
+          <input
+            type="date"
+            className={inputCls("target_implementation_date")}
+            value={form.target_implementation_date}
+            onChange={(e) => set("target_implementation_date", e.target.value)}
+          />
+          <FieldError messages={fieldErrors.target_implementation_date} />
+        </label>
 
         <label className="block text-sm">
           <span className="mb-1 block font-medium text-slate-700">

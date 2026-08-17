@@ -6,7 +6,7 @@ const BASE = import.meta.env.VITE_API_URL ?? "/api";
 
 const ajv = new Ajv2020({
   allErrors: true,
-  strict: false, // allow x-* extensions and OpenAPI-ish keywords from Pydantic export
+  strict: false,
   validateFormats: true,
 });
 addFormats(ajv);
@@ -36,7 +36,13 @@ export function errorsToFieldMap(errors: ErrorObject[] | null | undefined): {
 
   for (const err of errors) {
     const field = pathToField(err.instancePath, err.params?.missingProperty as string | undefined);
-    const msg = err.message ?? err.keyword;
+    let msg = err.message ?? err.keyword;
+    if (err.keyword === "format" && err.params?.format === "date") {
+      msg = "must be a valid calendar date (YYYY-MM-DD)";
+    }
+    if (err.keyword === "format" && err.params?.format === "date-time") {
+      msg = "must be ISO 8601 date-time with timezone (e.g. 2026-08-17T12:00:00Z)";
+    }
     if (field === "_form") {
       formErrors.push(msg);
     } else {
@@ -58,7 +64,7 @@ async function loadSchema(name: string): Promise<JsonSchema> {
       return schema;
     }
   } catch {
-    // fall through to local
+    // fall through
   }
 
   const local = LOCAL_SCHEMAS[name];
@@ -75,7 +81,6 @@ async function getValidator(name: string): Promise<ValidateFunction> {
   return validate;
 }
 
-/** Normalize payload before Ajv (empty justification → omit for optional). */
 export function prepareChangeCreatePayload(form: {
   title: string;
   description: string;
@@ -84,6 +89,7 @@ export function prepareChangeCreatePayload(form: {
   priority: string;
   requester: string;
   business_justification: string;
+  target_implementation_date: string;
 }): Record<string, unknown> {
   const payload: Record<string, unknown> = {
     title: form.title.trim(),
@@ -95,7 +101,19 @@ export function prepareChangeCreatePayload(form: {
   };
   const j = form.business_justification.trim();
   if (j) payload.business_justification = j;
+  const d = form.target_implementation_date.trim();
+  if (d) payload.target_implementation_date = d;
   return payload;
+}
+
+/** Client mirror of server "not in the past" rule (UTC date). */
+export function assertTargetDateNotPast(isoDate: string): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return null; // let Ajv format handle shape
+  const today = new Date().toISOString().slice(0, 10);
+  if (isoDate < today) {
+    return `target_implementation_date ${isoDate} is in the past (today UTC ${today})`;
+  }
+  return null;
 }
 
 export async function validateWithSchema(
@@ -109,7 +127,6 @@ export async function validateWithSchema(
   return { ok: false, fieldErrors, formErrors };
 }
 
-/** Extra client rules that mirror Pydantic actor policy (not pure JSON Schema). */
 const FORBIDDEN_ACTORS = new Set([
   "admin",
   "administrator",
@@ -123,16 +140,10 @@ const FORBIDDEN_ACTORS = new Set([
   "it",
 ]);
 
-export function applyActorPolicy(
-  result: ValidationResult,
-  actorFields: string[] = ["requester", "assessor", "actor"]
-): ValidationResult {
-  if (!result.ok) {
-    // still check actors on the attempted data is not available — only post-ok path needs merge
-    return result;
-  }
+export function applyActorPolicy(result: ValidationResult): ValidationResult {
+  if (!result.ok) return result;
   const fieldErrors: FieldErrors = {};
-  for (const f of actorFields) {
+  for (const f of ["requester", "assessor", "actor"]) {
     const v = result.data[f];
     if (typeof v === "string" && FORBIDDEN_ACTORS.has(v.toLowerCase())) {
       fieldErrors[f] = [
@@ -148,11 +159,10 @@ export function applyActorPolicy(
 
 export function applyActorPolicyOnErrors(
   data: Record<string, unknown>,
-  fieldErrors: FieldErrors,
-  actorFields: string[] = ["requester", "assessor", "actor"]
+  fieldErrors: FieldErrors
 ): FieldErrors {
   const next = { ...fieldErrors };
-  for (const f of actorFields) {
+  for (const f of ["requester", "assessor", "actor"]) {
     const v = data[f];
     if (typeof v === "string" && FORBIDDEN_ACTORS.has(v.toLowerCase())) {
       next[f] = [
@@ -160,6 +170,19 @@ export function applyActorPolicyOnErrors(
         `'${v}' is not allowed as an attributable actor; use a unique person id (e.g. a.reyes)`,
       ];
     }
+  }
+  return next;
+}
+
+export function applyDatePolicyOnErrors(
+  data: Record<string, unknown>,
+  fieldErrors: FieldErrors
+): FieldErrors {
+  const next = { ...fieldErrors };
+  const t = data.target_implementation_date;
+  if (typeof t === "string" && t) {
+    const msg = assertTargetDateNotPast(t);
+    if (msg) next.target_implementation_date = [...(next.target_implementation_date ?? []), msg];
   }
   return next;
 }

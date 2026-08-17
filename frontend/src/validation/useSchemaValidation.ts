@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import {
   applyActorPolicy,
   applyActorPolicyOnErrors,
+  applyDatePolicyOnErrors,
   validateWithSchema,
   type FieldErrors,
   type ValidationResult,
@@ -24,12 +25,16 @@ export function useSchemaValidation(schemaName: string) {
         let result = await validateWithSchema(schemaName, data);
         if (result.ok) {
           result = applyActorPolicy(result);
+          if (result.ok) {
+            const dateErrors = applyDatePolicyOnErrors(result.data, {});
+            if (Object.keys(dateErrors).length) {
+              result = { ok: false, fieldErrors: dateErrors, formErrors: [] };
+            }
+          }
         } else {
-          result = {
-            ...result,
-            fieldErrors: applyActorPolicyOnErrors(data, result.fieldErrors),
-          };
-          // if actor policy added errors, ok stays false
+          let fe = applyActorPolicyOnErrors(data, result.fieldErrors);
+          fe = applyDatePolicyOnErrors(data, fe);
+          result = { ...result, fieldErrors: fe };
         }
         if (result.ok) {
           setFieldErrors({});

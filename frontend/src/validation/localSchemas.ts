@@ -1,7 +1,5 @@
 /**
  * Local JSON Schema fallbacks (Draft 2020-12 aligned).
- * Prefer GET /schemas/{name} when the API is available; these keep the UI
- * usable offline and document the client contract.
  */
 
 export type JsonSchema = Record<string, unknown>;
@@ -28,6 +26,13 @@ export const changeCreateSchema: JsonSchema = {
     requester: { type: "string", minLength: 2, maxLength: 80 },
     business_justification: {
       anyOf: [{ type: "string", maxLength: 2000 }, { type: "null" }],
+    },
+    target_implementation_date: {
+      anyOf: [
+        { type: "string", format: "date", minLength: 10, maxLength: 10 },
+        { type: "null" },
+      ],
+      description: "YYYY-MM-DD; not in the past (enforced server-side and client extra check)",
     },
   },
   required: ["title", "description", "system_name", "change_type", "requester"],
