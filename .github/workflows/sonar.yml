@@ -15,8 +15,6 @@ jobs:
   sonar:
     name: Sonar scan
     runs-on: ubuntu-latest
-    # Skip gracefully when SONAR_TOKEN is not configured (local forks / before setup)
-    if: ${{ secrets.SONAR_TOKEN != '' }}
     permissions:
       contents: read
       pull-requests: write
@@ -25,16 +23,31 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # full history for blame / new code detection
+          fetch-depth: 0
+
+      - name: Detect SONAR_TOKEN
+        id: creds
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          if [ -n "$SONAR_TOKEN" ]; then
+            echo "has_token=true" >> "$GITHUB_OUTPUT"
+            echo "Sonar token present — scan will run"
+          else
+            echo "has_token=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::SONAR_TOKEN not configured. Skipping Sonar scan. See docs/SONARQUBE.md"
+          fi
 
       - name: Set up Python
+        if: steps.creds.outputs.has_token == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: requirements.txt
 
-      - name: Install Python deps & run tests with coverage
+      - name: Install Python deps & coverage
+        if: steps.creds.outputs.has_token == 'true'
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: |
@@ -43,21 +56,23 @@ jobs:
           pytest tests/ -q --cov=app --cov-report=xml --cov-report=term
 
       - name: Set up Node.js
+        if: steps.creds.outputs.has_token == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: npm
           cache-dependency-path: frontend/package.json
 
-      - name: Frontend install (for analysis paths)
+      - name: Frontend install
+        if: steps.creds.outputs.has_token == 'true'
         working-directory: frontend
         run: npm install
 
-      - name: SonarCloud Scan
+      - name: SonarCloud / SonarQube Scan
+        if: steps.creds.outputs.has_token == 'true'
         uses: SonarSource/sonarqube-scan-action@v4
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          # Optional: self-hosted SonarQube — set repo variable SONAR_HOST_URL
           SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL || 'https://sonarcloud.io' }}
         with:
           args: >
@@ -65,6 +80,7 @@ jobs:
             -Dsonar.organization=${{ vars.SONAR_ORGANIZATION || 'alianisreyesr' }}
 
       - name: Quality Gate
+        if: steps.creds.outputs.has_token == 'true'
         uses: SonarSource/sonarqube-quality-gate-action@v1
         timeout-minutes: 5
         env:
