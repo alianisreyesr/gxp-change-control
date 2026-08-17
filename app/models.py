@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import re
 from enum import Enum
-from typing import Optional
+from typing import Annotated, Optional
 
 from pydantic import (
+    AfterValidator,
     BaseModel,
     ConfigDict,
     Field,
+    StringConstraints,
     field_validator,
     model_validator,
 )
@@ -53,7 +55,6 @@ class Decision(str, Enum):
     request_info = "request_info"
 
 
-# Shared-account style identifiers discouraged for attributable GxP actions (educational).
 _FORBIDDEN_ACTORS = {
     "admin",
     "administrator",
@@ -87,6 +88,26 @@ def _normalize_person(value: str) -> str:
     return cleaned
 
 
+def _validate_change_id_str(value: str) -> str:
+    value = value.strip().upper()
+    if not _CHANGE_ID_RE.match(value):
+        raise ValueError("must match pattern CHG-[A-Z0-9]{4,12} (e.g. CHG-1001)")
+    return value
+
+
+ChangeIdStr = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=8, max_length=20),
+    AfterValidator(_validate_change_id_str),
+]
+
+PersonId = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=2, max_length=80),
+    AfterValidator(_normalize_person),
+]
+
+
 class PortfolioModel(BaseModel):
     """Base config: strip strings, forbid extra fields, use enum values in JSON."""
 
@@ -113,7 +134,7 @@ class ChangeCreate(PortfolioModel):
     system_name: str = Field(min_length=2, max_length=200)
     change_type: ChangeType
     priority: Priority = Priority.medium
-    requester: str = Field(min_length=2, max_length=80)
+    requester: PersonId
     business_justification: Optional[str] = Field(default=None, max_length=2000)
 
     @field_validator("title", "description", "system_name", "business_justification", mode="before")
@@ -126,11 +147,6 @@ class ChangeCreate(PortfolioModel):
             if v == "":
                 return None
         return v
-
-    @field_validator("requester")
-    @classmethod
-    def validate_requester(cls, v: str) -> str:
-        return _normalize_person(v)
 
     @field_validator("title")
     @classmethod
@@ -152,7 +168,7 @@ class ChangeCreate(PortfolioModel):
 
 
 class ChangeOut(PortfolioModel):
-    id: str
+    id: ChangeIdStr
     title: str
     description: str
     system_name: str
@@ -164,13 +180,6 @@ class ChangeOut(PortfolioModel):
     created_at: str
     updated_at: str
 
-    @field_validator("id")
-    @classmethod
-    def validate_change_id(cls, v: str) -> str:
-        if not _CHANGE_ID_RE.match(v):
-            raise ValueError("id must match CHG-XXXX pattern")
-        return v
-
 
 class ImpactAssessmentIn(PortfolioModel):
     affects_validated_state: bool = False
@@ -180,12 +189,7 @@ class ImpactAssessmentIn(PortfolioModel):
     affects_sops: bool = False
     risk_summary: str = Field(min_length=20, max_length=4000)
     residual_risk: ResidualRisk = ResidualRisk.low
-    assessor: str = Field(min_length=2, max_length=80)
-
-    @field_validator("assessor")
-    @classmethod
-    def validate_assessor(cls, v: str) -> str:
-        return _normalize_person(v)
+    assessor: PersonId
 
     @model_validator(mode="after")
     def residual_risk_consistency(self):
@@ -198,11 +202,9 @@ class ImpactAssessmentIn(PortfolioModel):
         ]
         hit_count = sum(1 for f in flags if f)
 
-        # Educational rule: claiming high residual risk requires a longer rationale
         if self.residual_risk in (ResidualRisk.high, "high") and len(self.risk_summary) < 40:
             raise ValueError("risk_summary must be at least 40 characters when residual_risk is high")
 
-        # If multiple GxP impact flags are true, residual_risk cannot be low without explanation length
         if hit_count >= 3 and self.residual_risk in (ResidualRisk.low, "low"):
             if len(self.risk_summary) < 60:
                 raise ValueError(
@@ -214,7 +216,7 @@ class ImpactAssessmentIn(PortfolioModel):
 
 class ImpactAssessmentOut(ImpactAssessmentIn):
     id: str
-    change_id: str
+    change_id: ChangeIdStr
     assessed_at: Optional[str] = None
 
 
@@ -222,12 +224,7 @@ class ApprovalIn(PortfolioModel):
     role: str = Field(min_length=2, max_length=80)
     decision: Decision
     comment: Optional[str] = Field(default=None, max_length=2000)
-    actor: str = Field(min_length=2, max_length=80)
-
-    @field_validator("actor")
-    @classmethod
-    def validate_actor(cls, v: str) -> str:
-        return _normalize_person(v)
+    actor: PersonId
 
     @field_validator("role")
     @classmethod
@@ -250,7 +247,7 @@ class ApprovalIn(PortfolioModel):
 
 class ApprovalOut(ApprovalIn):
     id: str
-    change_id: str
+    change_id: ChangeIdStr
     decided_at: str
 
 
@@ -264,14 +261,23 @@ class ActivityOut(PortfolioModel):
 
 
 class ActorQuery(PortfolioModel):
-    """Reusable actor query param validation."""
+    actor: PersonId
 
-    actor: str = Field(min_length=2, max_length=80)
 
-    @field_validator("actor")
-    @classmethod
-    def validate_actor(cls, v: str) -> str:
-        return _normalize_person(v)
+class ErrorDetail(PortfolioModel):
+    """Single field error in API validation responses."""
+
+    loc: list[str | int]
+    msg: str
+    type: str
+
+
+class ValidationErrorBody(PortfolioModel):
+    """Stable shape for 422 responses (portfolio / client-friendly)."""
+
+    error: str = "validation_error"
+    message: str = "Request failed Pydantic / FastAPI validation"
+    details: list[ErrorDetail]
 
 
 class HealthOut(PortfolioModel):

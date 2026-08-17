@@ -2,21 +2,19 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException
 
 from app.database import get_conn
+from app.deps import ActorParam, ChangeIdPath, StatusFilter
 from app.models import (
     ApprovalIn,
     ApprovalOut,
     ActivityOut,
-    ActorQuery,
     ChangeCreate,
     ChangeOut,
     ImpactAssessmentIn,
     ImpactAssessmentOut,
-    Status,
 )
 
 router = APIRouter(prefix="/changes", tags=["changes"])
@@ -37,21 +35,11 @@ def _log(conn, change_id: str, actor: str, action: str, detail: str = "") -> Non
     )
 
 
-def _validated_actor(actor: str) -> str:
-    """Validate actor query params with the same rules as body fields."""
-    return ActorQuery(actor=actor).actor
-
-
 @router.get("", response_model=list[ChangeOut])
-def list_changes(
-    status: Optional[Status] = Query(
-        default=None,
-        description="Filter by workflow status",
-    ),
-):
+def list_changes(status: StatusFilter = None):
     with get_conn() as conn:
         if status is not None:
-            status_val = status.value if isinstance(status, Status) else status
+            status_val = status.value if hasattr(status, "value") else status
             rows = conn.execute(
                 "SELECT * FROM changes WHERE status = ? ORDER BY updated_at DESC",
                 (status_val,),
@@ -61,8 +49,34 @@ def list_changes(
     return [_row_change(r) for r in rows]
 
 
-@router.post("", response_model=ChangeOut, status_code=201)
+@router.post(
+    "",
+    response_model=ChangeOut,
+    status_code=201,
+    summary="Create change request",
+    responses={
+        422: {
+            "description": "Pydantic validation failed",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "error": "validation_error",
+                        "message": "Request failed Pydantic / FastAPI validation",
+                        "details": [
+                            {
+                                "loc": ["body", "requester"],
+                                "msg": "'admin' is not allowed as an attributable actor",
+                                "type": "value_error",
+                            }
+                        ],
+                    }
+                }
+            },
+        }
+    },
+)
 def create_change(body: ChangeCreate):
+    """Body validated by **ChangeCreate** (enums, actor policy, priority rules)."""
     cid = f"CHG-{uuid.uuid4().hex[:6].upper()}"
     ts = _now()
     change_type = body.change_type.value if hasattr(body.change_type, "value") else body.change_type
@@ -94,7 +108,7 @@ def create_change(body: ChangeCreate):
 
 
 @router.get("/{change_id}", response_model=ChangeOut)
-def get_change(change_id: str):
+def get_change(change_id: ChangeIdPath):
     with get_conn() as conn:
         row = conn.execute("SELECT * FROM changes WHERE id = ?", (change_id,)).fetchone()
     if not row:
@@ -103,11 +117,7 @@ def get_change(change_id: str):
 
 
 @router.post("/{change_id}/submit", response_model=ChangeOut)
-def submit_change(
-    change_id: str,
-    actor: str = Query(..., min_length=2, max_length=80, description="Attributable person id"),
-):
-    actor = _validated_actor(actor)
+def submit_change(change_id: ChangeIdPath, actor: ActorParam):
     with get_conn() as conn:
         row = conn.execute("SELECT * FROM changes WHERE id = ?", (change_id,)).fetchone()
         if not row:
@@ -124,7 +134,7 @@ def submit_change(
 
 
 @router.post("/{change_id}/impact", response_model=ImpactAssessmentOut)
-def record_impact(change_id: str, body: ImpactAssessmentIn):
+def record_impact(change_id: ChangeIdPath, body: ImpactAssessmentIn):
     residual = body.residual_risk.value if hasattr(body.residual_risk, "value") else body.residual_risk
     with get_conn() as conn:
         row = conn.execute("SELECT * FROM changes WHERE id = ?", (change_id,)).fetchone()
@@ -176,7 +186,7 @@ def record_impact(change_id: str, body: ImpactAssessmentIn):
 
 
 @router.get("/{change_id}/impact", response_model=ImpactAssessmentOut)
-def get_impact(change_id: str):
+def get_impact(change_id: ChangeIdPath):
     with get_conn() as conn:
         ia = conn.execute(
             "SELECT * FROM impact_assessments WHERE change_id = ?", (change_id,)
@@ -196,7 +206,7 @@ def get_impact(change_id: str):
 
 
 @router.post("/{change_id}/approve", response_model=ApprovalOut)
-def approve_change(change_id: str, body: ApprovalIn):
+def approve_change(change_id: ChangeIdPath, body: ApprovalIn):
     decision = body.decision.value if hasattr(body.decision, "value") else body.decision
     with get_conn() as conn:
         row = conn.execute("SELECT * FROM changes WHERE id = ?", (change_id,)).fetchone()
@@ -229,12 +239,8 @@ def approve_change(change_id: str, body: ApprovalIn):
 
 
 @router.post("/{change_id}/advance", response_model=ChangeOut)
-def advance(
-    change_id: str,
-    actor: str = Query(..., min_length=2, max_length=80, description="Attributable person id"),
-):
+def advance(change_id: ChangeIdPath, actor: ActorParam):
     """Move approved → implementing → verification → closed."""
-    actor = _validated_actor(actor)
     transitions = {
         "approved": "implementing",
         "implementing": "verification",
@@ -258,7 +264,7 @@ def advance(
 
 
 @router.get("/{change_id}/activity", response_model=list[ActivityOut])
-def activity(change_id: str):
+def activity(change_id: ChangeIdPath):
     with get_conn() as conn:
         rows = conn.execute(
             "SELECT * FROM activity_log WHERE change_id = ? ORDER BY id DESC", (change_id,)
