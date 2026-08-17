@@ -99,7 +99,8 @@ jobs:
 
       - name: Bandit (Python SAST)
         run: |
-          bandit -r app -c bandit.yaml -f json -o bandit-report.json
+          # Keep the complete JSON report, but enforce the documented medium+ gate below.
+          bandit --exit-zero -r app -c bandit.yaml -f json -o bandit-report.json
           bandit -r app -c bandit.yaml -ll
 
       - name: pip-audit (Python dependency vulnerabilities)
