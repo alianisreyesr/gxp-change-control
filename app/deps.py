@@ -2,21 +2,19 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Optional
 
 from fastapi import Path, Query
-from pydantic import AfterValidator, ValidationError
+from pydantic import AfterValidator, TypeAdapter
 
-from app.models import ActorQuery, ChangeIdStr, Status, _normalize_person
+from app.models import Status, _normalize_person, _validate_change_id_str
+
+# TypeAdapters so FastAPI path/query validation shares model rules exactly.
+_change_id_adapter = TypeAdapter(str)
 
 
 def _parse_change_id(value: str) -> str:
-    """Validate path param using the same ChangeIdStr rules."""
-    try:
-        return ChangeIdStr(value)
-    except ValidationError as exc:
-        # Re-raise so FastAPI turns it into a 422 with detail
-        raise ValueError(exc.errors()[0]["msg"]) from exc
+    return _validate_change_id_str(value)
 
 
 def _parse_actor(value: str) -> str:
@@ -47,14 +45,9 @@ ActorParam = Annotated[
 ]
 
 StatusFilter = Annotated[
-    Status | None,
+    Optional[Status],
     Query(
         description="Optional workflow status filter",
         examples=["pending_approval"],
     ),
 ]
-
-
-def get_actor_query(actor: ActorParam) -> str:
-    """Dependency-style accessor (already validated)."""
-    return ActorQuery(actor=actor).actor
