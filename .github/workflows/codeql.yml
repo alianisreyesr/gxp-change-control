@@ -5,18 +5,31 @@ on:
     branches: [main, master]
   pull_request:
     branches: [main, master]
+  # Weekly deep scan — Monday 06:00 UTC
   schedule:
-    # Weekly security scan (Monday 06:00 UTC)
     - cron: "0 6 * * 1"
+  # Allow running from the Actions tab
+  workflow_dispatch:
+    inputs:
+      query_suite:
+        description: "CodeQL query suite"
+        type: choice
+        required: true
+        default: security-extended
+        options:
+          - security-extended
+          - security-and-quality
 
 concurrency:
-  group: codeql-${{ github.ref }}
-  cancel-in-progress: true
+  # Scheduled runs get their own group so a push does not cancel the weekly job
+  group: codeql-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'schedule' }}
 
 jobs:
   analyze:
-    name: Analyze
+    name: Analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     permissions:
       security-events: write
       contents: read
@@ -28,14 +41,27 @@ jobs:
         language: [python, javascript-typescript]
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Resolve query suite
+        id: queries
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "suite=security-extended,security-and-quality" >> "$GITHUB_OUTPUT"
+            echo "Weekly schedule: using security-extended + security-and-quality"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "suite=${{ inputs.query_suite }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "suite=security-extended" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
-          queries: security-extended
+          queries: ${{ steps.queries.outputs.suite }}
+          config-file: ./.github/codeql/codeql-config.yml
 
       - name: Autobuild
         uses: github/codeql-action/autobuild@v3
@@ -44,3 +70,19 @@ jobs:
         uses: github/codeql-action/analyze@v3
         with:
           category: "/language:${{ matrix.language }}"
+
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo "### CodeQL run"
+            echo
+            echo "| Field | Value |"
+            echo "|-------|-------|"
+            echo "| Event | \`${{ github.event_name }}\` |"
+            echo "| Language | \`${{ matrix.language }}\` |"
+            echo "| Queries | \`${{ steps.queries.outputs.suite }}\` |"
+            echo "| Ref | \`${{ github.ref }}\` |"
+            echo
+            echo "Results appear under **Security → Code scanning**."
+          } >> "$GITHUB_STEP_SUMMARY"

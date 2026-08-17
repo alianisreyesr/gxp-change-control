@@ -1,0 +1,20 @@
+name: "GxP Change Control CodeQL"
+
+# Focus on application source; skip docs, tests, and vendored noise.
+paths:
+  - app
+  - frontend/src
+
+paths-ignore:
+  - tests
+  - "**/*.md"
+  - "**/node_modules/**"
+  - "frontend/dist/**"
+  - schemas
+  - sql
+  - scripts
+
+# Optional: disable noisy queries later via query-filters if needed.
+# query-filters:
+#   - exclude:
+#       id: py/path-injection
