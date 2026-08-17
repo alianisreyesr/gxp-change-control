@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 
 from app.database import init_db
 from app.models import ErrorDetail, HealthOut, ValidationErrorBody
-from app.routers import changes, schemas
+from app.routers import changes, meta, schemas
 
 
 @asynccontextmanager
@@ -23,10 +23,11 @@ app = FastAPI(
     description=(
         "Portfolio-safe change control prototype. Synthetic data only. "
         "Not validated software — not for regulated decisions.\n\n"
-        "**Validation:** Pydantic v2 on requests; portable **JSON Schema** at `/schemas`. "
-        "Invalid input returns HTTP **422** with a structured `details` array."
+        "**Validation:** Pydantic v2; JSON Schema at `/schemas`; "
+        "**timezone policy** at `/meta/timezone-policy` (aware ISO required, storage UTC). "
+        "Invalid input → HTTP **422**."
     ),
-    version="0.1.2",
+    version="0.1.3",
     lifespan=lifespan,
 )
 
@@ -41,7 +42,6 @@ app.add_middleware(
 
 @app.exception_handler(RequestValidationError)
 async def pydantic_validation_handler(_: Request, exc: RequestValidationError):
-    """Normalize FastAPI/Pydantic 422 bodies for UI and API clients."""
     details: list[ErrorDetail] = []
     for err in exc.errors():
         loc = [str(x) for x in err.get("loc", ())]
@@ -61,6 +61,7 @@ async def pydantic_validation_handler(_: Request, exc: RequestValidationError):
 
 app.include_router(changes.router)
 app.include_router(schemas.router)
+app.include_router(meta.router)
 
 
 @app.get("/health", response_model=HealthOut)
@@ -69,5 +70,5 @@ def health():
         status="ok",
         service="gxp-change-control",
         data_classification="synthetic-portfolio-only",
-        version="0.1.2",
+        version="0.1.3",
     )
