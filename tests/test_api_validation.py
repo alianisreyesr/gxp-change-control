@@ -1,10 +1,13 @@
 """FastAPI + Pydantic integration tests (422 contract)."""
 
+import json
+from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
 
 from app import database
-from app.main import app
+from app.main import APP_VERSION, app
 
 
 @pytest.fixture()
@@ -18,7 +21,20 @@ def client(tmp_path, monkeypatch):
 def test_health_ok(client: TestClient):
     r = client.get("/health")
     assert r.status_code == 200
-    assert r.json()["data_classification"] == "synthetic-portfolio-only"
+    body = r.json()
+    assert body["data_classification"] == "synthetic-portfolio-only"
+    assert body["version"] == APP_VERSION
+    assert app.version == APP_VERSION
+
+    root = Path(__file__).resolve().parents[1]
+    package = json.loads((root / "frontend" / "package.json").read_text(encoding="utf-8"))
+    assert package["version"] == APP_VERSION
+
+    sonar = (root / "sonar-project.properties").read_text(encoding="utf-8")
+    assert f"sonar.projectVersion={APP_VERSION}" in sonar
+
+    changelog = (root / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert f"## [{APP_VERSION}]" in changelog
 
 
 def test_create_rejects_shared_actor_with_structured_422(client: TestClient):
