@@ -43,19 +43,19 @@ The project is intentionally transparent. Status transitions are explicit, valid
 
 ## Controlled workflow
 
-```text
-                        request_info
-                  ┌────────────────────┐
-                  │                    ▼
-draft/rejected → impact_assessment → pending_approval → approved
-      ▲                                      │              │
-      │                                      └─ reject ─────┘
-      │                                                     ▼
-      └──────────────── rejected                  implementing
-                                                             ▼
-                                                       verification
-                                                             ▼
-                                                           closed
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> draft
+    draft --> impact_assessment: submit
+    impact_assessment --> pending_approval: submit assessment
+    pending_approval --> approved: approve
+    pending_approval --> rejected: reject
+    pending_approval --> impact_assessment: request_info
+    rejected --> impact_assessment: resubmit
+    approved --> implementing: advance
+    implementing --> verification: advance
+    verification --> closed: advance
 ```
 
 | Stage | Evidence captured |
@@ -82,25 +82,14 @@ draft/rejected → impact_assessment → pending_approval → approved
 
 ## Architecture
 
-```text
-┌───────────────────────────────┐
-│ React 19 + TypeScript + Vite  │
-│ TanStack Query + Ajv schemas  │
-└───────────────┬───────────────┘
-                │ HTTP / JSON
-                ▼
-┌───────────────────────────────┐
-│ FastAPI + Pydantic v2         │
-│ Domain validation + workflow  │
-│ OpenAPI + JSON Schema routes  │
-└───────────────┬───────────────┘
-                │ parameterized SQL
-                ▼
-┌───────────────────────────────┐
-│ SQLite                        │
-│ changes · impact assessments  │
-│ approvals · activity log      │
-└───────────────────────────────┘
+```mermaid
+flowchart TD
+    UI["React 19 + TypeScript + Vite\nTanStack Query + Ajv schemas"]
+    API["FastAPI + Pydantic v2\nDomain validation + workflow\nOpenAPI + JSON Schema routes"]
+    DB[("SQLite\nchanges · impact assessments\napprovals · activity log")]
+
+    UI -->|HTTP / JSON| API
+    API -->|parameterized SQL| DB
 ```
 
 See [docs/STACK.md](docs/STACK.md), [docs/VALIDATION.md](docs/VALIDATION.md), and [docs/JSON_SCHEMA.md](docs/JSON_SCHEMA.md).
