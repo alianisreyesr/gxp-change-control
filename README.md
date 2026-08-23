@@ -226,12 +226,19 @@ The documentation uses GxP, data-integrity, Part 11, GAMP, and change-control vo
 
 Prototipo educativo de **control de cambios GxP** con datos sintéticos. Permite crear solicitudes, evaluar impacto, aprobar, rechazar o solicitar información adicional, avanzar por implementación/verificación/cierre y revisar el historial de actividad. Incluye FastAPI, React, validación Pydantic/Ajv, 68 pruebas, controles CI/SAST y Docker. **No es software validado ni debe utilizarse para decisiones reguladas.**
 
-## Related portfolio projects
+---
 
-- [Quality Deviation Risk Monitor](https://github.com/alianisreyesr/quality-deviation-risk-monitor)
-- [CSV Evidence Tracker](https://github.com/alianisreyesr/csv-evidence-tracker)
-- [CSA Assurance Planner](https://github.com/alianisreyesr/csa-assurance-planner)
-- [Data Integrity Case File](https://github.com/alianisreyesr/data-integrity-case-file)
+## Regulated Portfolio Ecosystem
+
+| Project | Domain Focus | Status |
+|---|---|---|
+| **[Quality Deviation Risk Monitor](https://github.com/alianisreyesr/quality-deviation-risk-monitor)** | Deviation prioritization & explainable risk scoring | ✅ Active · 57 tests |
+| **[CSV Evidence Tracker](https://github.com/alianisreyesr/csv-evidence-tracker)** | Requirements traceability, IQ/OQ/PQ test execution, audit trail | ✅ Active · 27 tests |
+| **[Data Integrity Case File](https://github.com/alianisreyesr/data-integrity-case-file)** | ALCOA+ investigation, CAPA readiness, local AI triage | ✅ Active |
+| **[CSA Assurance Planner](https://github.com/alianisreyesr/csa-assurance-planner)** | Risk-based software assurance planning, FDA CSA alignment | ✅ Active |
+| **[GxP Batch Data Pipeline](https://github.com/alianisreyesr/gxp-batch-data-pipeline)** | Batch manufacturing pipeline — DuckDB · dbt · Great Expectations | ✅ Active |
+
+---
 
 ## License
 
@@ -241,7 +248,10 @@ Released under the [MIT License](LICENSE). The license permits use of the code; 
 
 <div align="center">
 
-**Built by [Alianis Reyes-Reyes](https://www.linkedin.com/in/alianis-reyes-reyes/)**  
-UPRM · Former Eli Lilly Intern
+**Built by [Alianis Reyes-Reyes](https://www.linkedin.com/in/alianis-reyes-reyes/)**
+
+Information Systems @ UPRM · Eli Lilly Tech@Lilly Alumni
+
+*Change is inevitable — what matters is that it’s controlled, traceable, and evidence-based.*
 
 </div>
