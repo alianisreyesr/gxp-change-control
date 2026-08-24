@@ -197,21 +197,18 @@ See [docs/CI_CD.md](docs/CI_CD.md), [docs/SAST.md](docs/SAST.md), and [docs/CODE
 
 ## Repository structure
 
-```text
-gxp-change-control/
-├── app/                    # FastAPI API, models, database helpers, routers
-├── frontend/               # React + TypeScript reviewer interface
-├── sql/                    # SQLite schema
-├── schemas/                # Exported request JSON Schemas
-├── scripts/                # Schema export utility
-├── tests/                  # Unit, contract, integration, and workflow tests
-├── docs/                   # Architecture-adjacent controls and references
-├── .github/workflows/      # CI, CodeQL, and Sonar workflows
-├── Dockerfile
-├── docker-compose.yml
-├── CHANGELOG.md
-├── SECURITY.md
-└── LICENSE
+```mermaid
+flowchart TB
+  R["gxp-change-control"]
+  R --> A["app — FastAPI models, database helpers, and routers"]
+  R --> F["frontend — React and TypeScript reviewer interface"]
+  R --> S["sql — SQLite schema"]
+  R --> J["schemas — exported request JSON Schemas"]
+  R --> U["scripts — schema export utility"]
+  R --> T["tests — unit, contract, integration, and workflow tests"]
+  R --> D["docs — controls and technical references"]
+  R --> G[".github/workflows — CI, CodeQL, and Sonar workflows"]
+  R --> P["Docker, changelog, security, and license files"]
 ```
 
 ## Scope and production limitations

@@ -2,13 +2,14 @@
 
 ## Pipeline
 
-```text
-Form submit
-  → prepare payload
-  → Ajv validate (JSON Schema from GET /schemas/{name} or local fallback)
-  → actor policy (mirrors Pydantic shared-account rules)
-  → POST API
-  → if 422: map server details → field errors
+```mermaid
+flowchart LR
+  A["Form submit"] --> B["Prepare payload"]
+  B --> C["Ajv validation"]
+  D["GET /schemas/{name} or local fallback"] --> C
+  C --> E["Actor policy matching shared-account rules"]
+  E --> F["POST API"]
+  F -->|422 response| G["Map server details to field errors"]
 ```
 
 ## Packages
