@@ -19,7 +19,7 @@
 
 *A portfolio-safe, full-stack prototype for controlled GxP-style change workflows*
 
-[Screenshots](#portfolio-preview) · [Quick start](#quick-start) · [Case study](docs/CASE_STUDY.md) · [Workflow](#controlled-workflow) · [API](#api-surface) · [Quality gates](#validation-and-quality-gates) · [Security](SECURITY.md) · [Español](#español--resumen)
+[Screenshots](#portfolio-preview) · [Quick start](#quick-start) · [Case study](docs/CASE_STUDY.md) · [Workflow](#controlled-workflow) · [API](#api-surface) · [Quality gates](#validation-and-quality-gates) · [Security](SECURITY.md)
 
 </div>
 
@@ -231,10 +231,6 @@ See [docs/PORTFOLIO_SAFETY.md](docs/PORTFOLIO_SAFETY.md) and [docs/ROADMAP.md](d
 ## Regulatory context
 
 The documentation uses GxP, data-integrity, Part 11, GAMP, and change-control vocabulary for educational mapping. These references provide context; they do not make the software compliant or validated. See [docs/REGULATORY_REFERENCES.md](docs/REGULATORY_REFERENCES.md).
-
-## Español — resumen
-
-Prototipo educativo de **control de cambios GxP** con datos sintéticos. Permite crear solicitudes, evaluar impacto, aprobar, rechazar o solicitar información adicional, avanzar por implementación/verificación/cierre y revisar el historial de actividad. Incluye FastAPI, React, validación Pydantic/Ajv, 68 pruebas, controles CI/SAST y Docker. **No es software validado ni debe utilizarse para decisiones reguladas.**
 
 ---
 
