@@ -19,7 +19,7 @@
 
 *A portfolio-safe, full-stack prototype for controlled GxP-style change workflows*
 
-[Quick start](#quick-start) · [Workflow](#controlled-workflow) · [API](#api-surface) · [Quality gates](#validation-and-quality-gates) · [Security](SECURITY.md) · [Roadmap](docs/ROADMAP.md) · [Español](#español--resumen)
+[Screenshots](#portfolio-preview) · [Quick start](#quick-start) · [Case study](docs/CASE_STUDY.md) · [Workflow](#controlled-workflow) · [API](#api-surface) · [Quality gates](#validation-and-quality-gates) · [Security](SECURITY.md) · [Español](#español--resumen)
 
 </div>
 
@@ -28,6 +28,16 @@
 > **Data boundary:** Every record and scenario is synthetic. This repository contains no proprietary, personal, employer, production, or regulated data. It is **not validated software** and must not be used to approve real changes, support product release, or claim regulatory compliance.
 
 ---
+
+## Portfolio preview
+
+| Change queue | New controlled-change request |
+|---|---|
+| ![Synthetic change queue with priority and workflow status](docs/assets/dashboard.png) | ![Synthetic change request form](docs/assets/new-change.png) |
+
+![Synthetic change detail with impact assessment and activity history](docs/assets/change-detail.png)
+
+**[Watch the 60-second walkthrough](docs/assets/gxp-change-control-walkthrough.mp4)** · See the [case study](docs/CASE_STUDY.md) for the business problem, users, decisions, evidence, and production boundary.
 
 ## What this is
 
