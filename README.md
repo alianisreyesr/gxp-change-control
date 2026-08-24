@@ -250,7 +250,7 @@ Released under the [MIT License](LICENSE). The license permits use of the code; 
 
 **Built by [Alianis Reyes-Reyes](https://www.linkedin.com/in/alianis-reyes-reyes/)**
 
-Information Systems @ UPRM · Eli Lilly Tech@Lilly Alumni
+Information Systems @ UPRM ·
 
 *Change is inevitable — what matters is that it’s controlled, traceable, and evidence-based.*
 
