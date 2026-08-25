@@ -70,7 +70,7 @@ jobs:
 
       - name: SonarCloud / SonarQube Scan
         if: steps.creds.outputs.has_token == 'true'
-        uses: SonarSource/sonarqube-scan-action@v4
+        uses: SonarSource/sonarqube-scan-action@v8
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL || 'https://sonarcloud.io' }}
