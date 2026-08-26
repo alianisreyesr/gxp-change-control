@@ -34,7 +34,11 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: |
-          pytest tests/ -v --tb=short --cov=app --cov-report=term-missing --cov-report=xml
+          pytest tests/ -v --tb=short \
+            --cov=app \
+            --cov-report=term-missing \
+            --cov-report=xml \
+            --cov-fail-under=70
 
       - name: Upload coverage artifact
         if: always()
@@ -99,7 +103,6 @@ jobs:
 
       - name: Bandit (Python SAST)
         run: |
-          # Keep the complete JSON report, but enforce the documented medium+ gate below.
           bandit --exit-zero -r app -c bandit.yaml -f json -o bandit-report.json
           bandit -r app -c bandit.yaml -ll
 
@@ -168,4 +171,4 @@ jobs:
             echo "One or more CI jobs failed"
             exit 1
           fi
-          echo "All CI jobs passed (including SAST)"
+          echo "All CI jobs passed (including SAST + coverage gate)"
