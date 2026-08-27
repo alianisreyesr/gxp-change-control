@@ -1,0 +1,13 @@
+# Development and testing dependencies
+# Install with: pip install -r requirements-dev.txt
+-r requirements.txt
+
+# Security and dependency scanning (also installed inline by the CI sast job)
+bandit[toml]>=1.7
+pip-audit>=2.7
+
+# Linting
+ruff>=0.5
+
+# Type checking
+mypy>=1.10
