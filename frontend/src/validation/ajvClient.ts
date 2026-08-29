@@ -186,3 +186,44 @@ export function applyDatePolicyOnErrors(
   }
   return next;
 }
+
+const IMPACT_FLAG_FIELDS = [
+  "affects_validated_state",
+  "affects_part11_controls",
+  "affects_data_integrity",
+  "affects_training",
+  "affects_sops",
+] as const;
+
+/**
+ * Client mirror of ImpactAssessmentIn.residual_risk_consistency (app/models.py):
+ * when three or more impact flags are true, residual_risk="low" requires a
+ * risk_summary of at least 60 characters. The JSON Schema alone can't express
+ * "count of true booleans", so this is applied the same way as the actor and
+ * date policies above.
+ */
+export function assertResidualRiskConsistency(
+  data: Record<string, unknown>
+): string | null {
+  const residualRisk = data.residual_risk;
+  const riskSummary = data.risk_summary;
+  if (residualRisk !== "low" || typeof riskSummary !== "string") return null;
+  const hitCount = IMPACT_FLAG_FIELDS.filter((f) => data[f] === true).length;
+  if (hitCount >= 3 && riskSummary.trim().length < 60) {
+    return (
+      "when three or more impact flags are true, residual_risk=low requires " +
+      "a detailed risk_summary (min 60 chars) explaining why residual risk remains low"
+    );
+  }
+  return null;
+}
+
+export function applyResidualRiskPolicyOnErrors(
+  data: Record<string, unknown>,
+  fieldErrors: FieldErrors
+): FieldErrors {
+  const next = { ...fieldErrors };
+  const msg = assertResidualRiskConsistency(data);
+  if (msg) next.risk_summary = [...(next.risk_summary ?? []), msg];
+  return next;
+}

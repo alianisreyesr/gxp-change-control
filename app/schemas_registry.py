@@ -37,8 +37,8 @@ def build_schema(name: str) -> dict[str, Any]:
     if name not in MODEL_MAP:
         raise KeyError(name)
     model = MODEL_MAP[name]
-    schema = model.model_json_schema(mode="serialization" if name.endswith("-out") else "validation")
-    # Prefer validation mode for inputs; outputs still fine with validation mode for docs.
+    # Validation mode for both inputs and outputs: outputs are still fine
+    # documented this way, and inputs need validation-mode constraints.
     schema = model.model_json_schema(mode="validation")
     schema["$id"] = f"https://alianisreyesr.github.io/gxp-change-control/schemas/{name}.json"
     schema["$schema"] = SCHEMA_DIALECT

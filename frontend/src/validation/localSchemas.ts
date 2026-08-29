@@ -49,6 +49,18 @@ export const changeCreateSchema: JsonSchema = {
         required: ["business_justification"],
       },
     },
+    {
+      // Mirrors ChangeCreate.title_not_placeholder (app/models.py): the server
+      // rejects placeholder-looking titles even when the schema-level minLength
+      // is satisfied, so surface that here too instead of only via a 422.
+      not: {
+        properties: {
+          title: {
+            enum: ["test", "Test", "TEST", "asdf", "xxx", "tbd", "TBD", "n/a", "N/A", "todo", "TODO"],
+          },
+        },
+      },
+    },
   ],
 };
 

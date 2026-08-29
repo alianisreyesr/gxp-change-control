@@ -3,6 +3,8 @@ import {
   applyActorPolicy,
   applyActorPolicyOnErrors,
   applyDatePolicyOnErrors,
+  applyResidualRiskPolicyOnErrors,
+  assertResidualRiskConsistency,
   validateWithSchema,
   type FieldErrors,
   type ValidationResult,
@@ -27,6 +29,8 @@ export function useSchemaValidation(schemaName: string) {
           result = applyActorPolicy(result);
           if (result.ok) {
             const dateErrors = applyDatePolicyOnErrors(result.data, {});
+            const riskMsg = assertResidualRiskConsistency(result.data);
+            if (riskMsg) dateErrors.risk_summary = [...(dateErrors.risk_summary ?? []), riskMsg];
             if (Object.keys(dateErrors).length) {
               result = { ok: false, fieldErrors: dateErrors, formErrors: [] };
             }
@@ -34,6 +38,7 @@ export function useSchemaValidation(schemaName: string) {
         } else {
           let fe = applyActorPolicyOnErrors(data, result.fieldErrors);
           fe = applyDatePolicyOnErrors(data, fe);
+          fe = applyResidualRiskPolicyOnErrors(data, fe);
           result = { ...result, fieldErrors: fe };
         }
         if (result.ok) {

@@ -39,7 +39,6 @@ class Priority(str, Enum):
 
 class Status(str, Enum):
     draft = "draft"
-    submitted = "submitted"
     impact_assessment = "impact_assessment"
     pending_approval = "pending_approval"
     approved = "approved"
@@ -47,7 +46,6 @@ class Status(str, Enum):
     implementing = "implementing"
     verification = "verification"
     closed = "closed"
-    cancelled = "cancelled"
 
 
 class ResidualRisk(str, Enum):

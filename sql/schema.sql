@@ -9,8 +9,8 @@ CREATE TABLE IF NOT EXISTS changes (
   change_type TEXT NOT NULL CHECK (change_type IN ('configuration','code','process','infrastructure','documentation')),
   priority TEXT NOT NULL CHECK (priority IN ('low','medium','high','critical')),
   status TEXT NOT NULL CHECK (status IN (
-    'draft','submitted','impact_assessment','pending_approval','approved','rejected',
-    'implementing','verification','closed','cancelled'
+    'draft','impact_assessment','pending_approval','approved','rejected',
+    'implementing','verification','closed'
   )),
   requester TEXT NOT NULL,
   business_justification TEXT,
