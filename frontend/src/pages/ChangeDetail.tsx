@@ -291,7 +291,7 @@ export default function ChangeDetail() {
             </button>
           )}
 
-          {(c.status === "impact_assessment" || c.status === "submitted") && (
+          {c.status === "impact_assessment" && (
             <form onSubmit={onImpactSubmit} className="mt-5 space-y-4 border-t border-slate-200 pt-5" noValidate>
               <div>
                 <h3 className="font-medium text-brand-900">Impact assessment</h3>

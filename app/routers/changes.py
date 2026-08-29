@@ -38,10 +38,9 @@ def _log(conn, change_id: str, actor: str, action: str, detail: str = "") -> Non
 def list_changes(status: StatusFilter = None):
     with get_conn() as conn:
         if status is not None:
-            status_val = status.value if hasattr(status, "value") else status
             rows = conn.execute(
                 "SELECT * FROM changes WHERE status = ? ORDER BY updated_at DESC",
-                (status_val,),
+                (status,),
             ).fetchall()
         else:
             rows = conn.execute("SELECT * FROM changes ORDER BY updated_at DESC").fetchall()
@@ -52,8 +51,9 @@ def list_changes(status: StatusFilter = None):
 def create_change(body: ChangeCreate):
     cid = f"CHG-{uuid.uuid4().hex[:6].upper()}"
     ts = utc_now_iso()
-    change_type = body.change_type.value if hasattr(body.change_type, "value") else body.change_type
-    priority = body.priority.value if hasattr(body.priority, "value") else body.priority
+    # PortfolioModel uses use_enum_values=True, so these are already plain strings.
+    change_type = body.change_type
+    priority = body.priority
     with get_conn() as conn:
         conn.execute(
             """
@@ -109,12 +109,12 @@ def submit_change(change_id: ChangeIdPath, actor: ActorParam):
 
 @router.post("/{change_id}/impact", response_model=ImpactAssessmentOut)
 def record_impact(change_id: ChangeIdPath, body: ImpactAssessmentIn):
-    residual = body.residual_risk.value if hasattr(body.residual_risk, "value") else body.residual_risk
+    residual = body.residual_risk  # PortfolioModel uses use_enum_values=True
     with get_conn() as conn:
         row = conn.execute("SELECT * FROM changes WHERE id = ?", (change_id,)).fetchone()
         if not row:
             raise HTTPException(404, "Change not found")
-        if row["status"] not in ("impact_assessment", "submitted"):
+        if row["status"] != "impact_assessment":
             raise HTTPException(400, f"Cannot assess impact from status={row['status']}")
         ia_id = f"IA-{uuid.uuid4().hex[:6].upper()}"
         ts = utc_now_iso()
@@ -181,7 +181,7 @@ def get_impact(change_id: ChangeIdPath):
 
 @router.post("/{change_id}/approve", response_model=ApprovalOut)
 def approve_change(change_id: ChangeIdPath, body: ApprovalIn):
-    decision = body.decision.value if hasattr(body.decision, "value") else body.decision
+    decision = body.decision  # PortfolioModel uses use_enum_values=True
     with get_conn() as conn:
         row = conn.execute("SELECT * FROM changes WHERE id = ?", (change_id,)).fetchone()
         if not row:

@@ -263,10 +263,8 @@ def convert_local_iso_to_utc(
                 return inst.utc_iso
         raise ValueError(f"fold must be 0 or 1; got {fold}")
 
-    # unique
-    if fold is not None and analysis.instants and analysis.instants[0].fold != fold:
-        # Allow caller to pass fold=0 on unique times; ignore mismatch if only one instant
-        pass
+    # unique — a fold value is meaningless here (only one instant exists), so any
+    # caller-supplied fold is silently ignored rather than rejected.
     return analysis.instants[0].utc_iso
 
 
