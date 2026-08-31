@@ -10,4 +10,4 @@ pip-audit>=2.7
 ruff>=0.5
 
 # Type checking
-mypy>=1.10
+mypy>=2.3.1
