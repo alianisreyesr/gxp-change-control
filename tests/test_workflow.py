@@ -172,3 +172,33 @@ def test_invalid_advance_does_not_add_activity(client: TestClient):
 
     after = client.get(f"/changes/{change_id}/activity").json()
     assert after == before
+
+
+def test_requester_cannot_approve_own_change(client: TestClient):
+    change_id = create_change(client)
+    assert client.post(f"/changes/{change_id}/submit?actor=a.reyes").status_code == 200
+    impact = {
+        "affects_validated_state": True,
+        "affects_part11_controls": False,
+        "affects_data_integrity": False,
+        "affects_training": False,
+        "affects_sops": False,
+        "risk_summary": "The validated state is affected and requires documented verification.",
+        "residual_risk": "medium",
+        "assessor": "risk.assessor",
+    }
+    assert client.post(f"/changes/{change_id}/impact", json=impact).status_code == 200
+    response = client.post(
+        f"/changes/{change_id}/approve",
+        json={"role": "Quality", "decision": "approve", "actor": "a.reyes"},
+    )
+    assert response.status_code == 403
+    assert "Segregation of duties" in response.json()["detail"]
+
+
+def test_unrecognized_approval_role_is_rejected(client: TestClient):
+    response = client.post(
+        "/changes/CHG-1001/approve",
+        json={"role": "Intern", "decision": "approve", "actor": "a.reyes"},
+    )
+    assert response.status_code == 422
