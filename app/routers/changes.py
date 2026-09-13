@@ -188,6 +188,11 @@ def approve_change(change_id: ChangeIdPath, body: ApprovalIn):
             raise HTTPException(404, "Change not found")
         if row["status"] != "pending_approval":
             raise HTTPException(400, f"Cannot decide from status={row['status']}")
+        if body.actor == row["requester"]:
+            raise HTTPException(
+                403,
+                "Segregation of duties: the requester cannot approve their own change",
+            )
         aid = f"APR-{uuid.uuid4().hex[:6].upper()}"
         ts = utc_now_iso()
         conn.execute(
