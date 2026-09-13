@@ -60,6 +60,13 @@ class Decision(str, Enum):
     request_info = "request_info"
 
 
+class ApprovalRole(str, Enum):
+    quality = "Quality"
+    business_owner = "Business Owner"
+    system_owner = "System Owner"
+    it_security = "IT Security"
+
+
 _FORBIDDEN_ACTORS = {
     "admin",
     "administrator",
@@ -269,18 +276,10 @@ class ImpactAssessmentOut(ImpactAssessmentIn):
 
 
 class ApprovalIn(PortfolioModel):
-    role: str = Field(min_length=2, max_length=80)
+    role: ApprovalRole
     decision: Decision
     comment: Optional[str] = Field(default=None, max_length=2000)
     actor: PersonId
-
-    @field_validator("role")
-    @classmethod
-    def validate_role(cls, v: str) -> str:
-        v = v.strip()
-        if len(v) < 2:
-            raise ValueError("role is required")
-        return v
 
     @model_validator(mode="after")
     def decision_comment_rules(self):
