@@ -18,7 +18,7 @@ export default function NewChange() {
     system_name: "",
     change_type: "configuration",
     priority: "medium",
-    requester: "a.reyes",
+    requester: api.sessionUser()?.username ?? "",
     business_justification: "",
     target_implementation_date: "",
   });
@@ -85,7 +85,7 @@ export default function NewChange() {
           <input
             className={inputCls("requester")}
             value={form.requester}
-            onChange={(e) => set("requester", e.target.value)}
+            readOnly
           />
           <FieldError messages={fieldErrors.requester} />
         </label>
