@@ -4,7 +4,7 @@
 
 # Security and dependency scanning (also installed inline by the CI sast job)
 bandit[toml]>=1.7
-pip-audit>=2.7
+pip-audit>=2.10.1
 
 # Linting
 ruff>=0.5
