@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 
 from app.database import init_db
 from app.models import ErrorDetail, HealthOut, ValidationErrorBody
-from app.routers import changes, meta, schemas
+from app.routers import auth, changes, meta, schemas
 
 APP_VERSION = "1.0.0"
 
@@ -62,6 +62,7 @@ async def pydantic_validation_handler(_: Request, exc: RequestValidationError):
 
 
 app.include_router(changes.router)
+app.include_router(auth.router)
 app.include_router(schemas.router)
 app.include_router(meta.router)
 
