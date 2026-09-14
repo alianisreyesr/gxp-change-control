@@ -1,4 +1,22 @@
 const BASE = import.meta.env.VITE_API_URL ?? "/api";
+const TOKEN_KEY = "gxp_access_token";
+const USER_KEY = "gxp_auth_user";
+
+export type AuthUser = { username: string; role: string };
+
+function storedToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+function storedUser(): AuthUser | null {
+  const raw = localStorage.getItem(USER_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as AuthUser;
+  } catch {
+    return null;
+  }
+}
 
 export class ApiError extends Error {
   status: number;
@@ -26,6 +44,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (init?.body && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
+  const token = storedToken();
+  if (token && !headers.has("Authorization")) headers.set("Authorization", `Bearer ${token}`);
 
   const res = await fetch(`${BASE}${path}`, { ...init, headers });
   if (!res.ok) {
@@ -105,6 +125,20 @@ export function map422ToFields(body: unknown): Record<string, string[]> {
 }
 
 export const api = {
+  sessionUser: storedUser,
+  login: async (username: string, password: string) => {
+    const result = await request<{ access_token: string; user: AuthUser }>("/auth/token", {
+      method: "POST",
+      body: JSON.stringify({ username, password }),
+    });
+    localStorage.setItem(TOKEN_KEY, result.access_token);
+    localStorage.setItem(USER_KEY, JSON.stringify(result.user));
+    return result.user;
+  },
+  logout: () => {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+  },
   health: () => request<{ status: string; data_classification: string }>("/health"),
   listChanges: (status?: string) =>
     request<Change[]>(status ? `/changes?status=${encodeURIComponent(status)}` : "/changes"),
