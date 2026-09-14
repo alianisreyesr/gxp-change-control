@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import sqlite3
-from pathlib import Path
 from contextlib import contextmanager
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 DB_PATH = ROOT / "data" / "change_control.db"
@@ -44,6 +44,16 @@ def init_db() -> None:
         count = conn.execute("SELECT COUNT(*) AS c FROM changes").fetchone()["c"]
         if count == 0:
             _seed(conn)
+
+
+def log_security_event(actor: str, role: str, action: str, reason: str, change_id: str | None = None) -> None:
+    from app.datetime_validation import utc_now_iso
+
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO security_events (actor, role, action, change_id, reason, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (actor, role, action, change_id, reason, utc_now_iso()),
+        )
 
 
 def _seed(conn: sqlite3.Connection) -> None:

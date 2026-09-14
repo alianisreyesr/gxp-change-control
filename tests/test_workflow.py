@@ -4,6 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app import database
+from app.auth import Role, User, create_access_token
 from app.main import app
 
 
@@ -12,6 +13,8 @@ def client(tmp_path, monkeypatch):
     """Run workflow tests against an isolated SQLite database."""
     monkeypatch.setattr(database, "DB_PATH", tmp_path / "change_control.db")
     with TestClient(app) as test_client:
+        token = create_access_token(User(username="admin.demo", role=Role.admin))
+        test_client.headers.update({"Authorization": f"Bearer {token}"})
         yield test_client
 
 
@@ -188,6 +191,8 @@ def test_requester_cannot_approve_own_change(client: TestClient):
         "assessor": "risk.assessor",
     }
     assert client.post(f"/changes/{change_id}/impact", json=impact).status_code == 200
+    token = create_access_token(User(username="a.reyes", role=Role.quality_approver))
+    client.headers.update({"Authorization": f"Bearer {token}"})
     response = client.post(
         f"/changes/{change_id}/approve",
         json={"role": "Quality", "decision": "approve", "actor": "a.reyes"},

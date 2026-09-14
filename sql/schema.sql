@@ -53,5 +53,16 @@ CREATE TABLE IF NOT EXISTS activity_log (
   created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS security_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  actor TEXT NOT NULL,
+  role TEXT NOT NULL,
+  action TEXT NOT NULL,
+  change_id TEXT,
+  reason TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_changes_status ON changes(status);
 CREATE INDEX IF NOT EXISTS idx_activity_change ON activity_log(change_id);
+CREATE INDEX IF NOT EXISTS idx_security_events_created ON security_events(created_at);

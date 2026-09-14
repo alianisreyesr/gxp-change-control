@@ -7,6 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app import database
+from app.auth import Role, User, create_access_token
 from app.main import APP_VERSION, app
 
 
@@ -15,6 +16,8 @@ def client(tmp_path, monkeypatch):
     """Run each API test against an isolated database with app lifespan enabled."""
     monkeypatch.setattr(database, "DB_PATH", tmp_path / "change_control.db")
     with TestClient(app) as test_client:
+        token = create_access_token(User(username="admin.demo", role=Role.admin))
+        test_client.headers.update({"Authorization": f"Bearer {token}"})
         yield test_client
 
 
