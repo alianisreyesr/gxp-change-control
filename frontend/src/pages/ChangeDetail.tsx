@@ -56,7 +56,8 @@ export default function ChangeDetail() {
   const { id = "" } = useParams();
   const qc = useQueryClient();
 
-  const [actor, setActor] = useState("a.reyes");
+  const [actor] = useState(api.sessionUser()?.username ?? "");
+  const currentRole = api.sessionUser()?.role ?? "";
   const [actorErrors, setActorErrors] = useState<string[]>([]);
   const [actionError, setActionError] = useState<string | null>(null);
   const [impactForm, setImpactForm] = useState<ImpactFormState>({
@@ -273,15 +274,12 @@ export default function ChangeDetail() {
                 combinedActorErrors.length ? "border-rose-400 ring-1 ring-rose-200" : "border-slate-300"
               }`}
               value={actor}
-              onChange={(event) => {
-                setActor(event.target.value);
-                setActorErrors([]);
-              }}
+              readOnly
             />
             <FieldError messages={combinedActorErrors} />
           </label>
 
-          {(c.status === "draft" || c.status === "rejected") && (
+          {(currentRole === "requester" || currentRole === "admin") && (c.status === "draft" || c.status === "rejected") && (
             <button
               className="btn-primary mt-4"
               onClick={() => submitM.mutate()}
@@ -291,7 +289,7 @@ export default function ChangeDetail() {
             </button>
           )}
 
-          {c.status === "impact_assessment" && (
+          {(currentRole === "assessor" || currentRole === "admin") && c.status === "impact_assessment" && (
             <form onSubmit={onImpactSubmit} className="mt-5 space-y-4 border-t border-slate-200 pt-5" noValidate>
               <div>
                 <h3 className="font-medium text-brand-900">Impact assessment</h3>
@@ -370,7 +368,7 @@ export default function ChangeDetail() {
             </form>
           )}
 
-          {c.status === "pending_approval" && (
+          {(currentRole === "quality_approver" || currentRole === "admin") && c.status === "pending_approval" && (
             <form onSubmit={onApprovalSubmit} className="mt-5 space-y-4 border-t border-slate-200 pt-5" noValidate>
               <div>
                 <h3 className="font-medium text-brand-900">Approval decision</h3>
@@ -385,9 +383,7 @@ export default function ChangeDetail() {
                   <input
                     className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
                     value={approvalForm.role}
-                    onChange={(event) =>
-                      setApprovalForm((current) => ({ ...current, role: event.target.value }))
-                    }
+                    readOnly
                   />
                   <FieldError messages={approvalValidation.fieldErrors.role} />
                 </label>
@@ -454,7 +450,8 @@ export default function ChangeDetail() {
             </form>
           )}
 
-          {["approved", "implementing", "verification"].includes(c.status) && (
+          {((c.status === "approved" && ["implementer", "admin"].includes(currentRole)) ||
+            (["implementing", "verification"].includes(c.status) && ["verifier", "admin"].includes(currentRole))) && (
             <button
               className="btn-primary mt-4"
               onClick={() => advanceM.mutate()}
