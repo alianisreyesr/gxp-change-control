@@ -5,7 +5,7 @@
 [![CI](https://github.com/alianisreyesr/gxp-change-control/actions/workflows/ci.yml/badge.svg)](https://github.com/alianisreyesr/gxp-change-control/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/alianisreyesr/gxp-change-control/actions/workflows/codeql.yml/badge.svg)](https://github.com/alianisreyesr/gxp-change-control/actions/workflows/codeql.yml)
 ![Release](https://img.shields.io/badge/release-v1.0.0-2ea44f?style=flat)
-![Tests](https://img.shields.io/badge/tests-70%20passing-brightgreen?style=flat)
+![Tests](https://img.shields.io/badge/tests-78%20passing-brightgreen?style=flat)
 ![License](https://img.shields.io/badge/license-MIT-green?style=flat)
 
 ![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat&logo=python&logoColor=white)
@@ -89,6 +89,7 @@ stateDiagram-v2
 | **Client validation** | Ajv Draft 2020-12 validation with local schema fallback and server-side revalidation |
 | **Time integrity** | UTC normalization, IANA time-zone validation, DST fold/gap handling, server timestamps |
 | **Delivery controls** | pytest, TypeScript, Vite build, Bandit, dependency audits, CodeQL, Docker build, optional Sonar scan |
+| **Authentication & RBAC** | Expiring JWTs, PBKDF2 demo credentials, role-bound transitions, segregation of duties, and security-denial events |
 
 ## Architecture
 
@@ -165,7 +166,7 @@ Never load real change-control records, employee identifiers, credentials, valid
 
 ## Validation and quality gates
 
-The current baseline includes **70 passing pytest tests across eight test modules**. Coverage includes models, API validation, full workflow transitions, controlled approval roles, segregation of duties, JSON Schema contracts, ISO date-time rules, DST folds and gaps, and non-hour DST transitions.
+The current baseline includes **78 passing pytest tests across nine test modules**. Coverage includes authentication, role authorization, security events, full workflow transitions, segregation of duties, JSON Schema contracts, ISO date-time rules, DST folds and gaps, and non-hour DST transitions.
 
 GitHub Actions gates changes with:
 
@@ -215,7 +216,7 @@ flowchart TB
 
 This release is suitable for portfolio review and local experimentation only. A real controlled system would additionally require, at minimum:
 
-- identity management, authentication, role-based authorization, and segregation of duties;
+- enterprise identity federation, MFA, account lifecycle governance, and external secrets management;
 - electronic-signature controls and signature meaning where applicable;
 - multi-approver rules, delegation, escalation, and quality-unit governance;
 - immutable or independently protected audit records, retention controls, and periodic review;
