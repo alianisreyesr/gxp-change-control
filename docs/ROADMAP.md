@@ -24,7 +24,7 @@
 
 ### Quality, governance, and release
 
-- [x] 70 pytest tests across model, API, schema, time-zone, authorization, and full-workflow behavior
+- [x] 78 pytest tests across authentication, API, schema, time-zone, authorization, and full-workflow behavior
 - [x] TypeScript type checking and Vite production build
 - [x] Required CI aggregate gate
 - [x] Bandit, `pip-audit`, and `npm audit`
@@ -39,13 +39,13 @@
 
 ### Priority 1 — Identity and decision controls
 
-- [ ] Add authentication and role-based authorization
+- [x] Add expiring JWT authentication and role-based authorization for every mutating workflow action
 - [x] Enforce the first segregation-of-duties control: requesters cannot approve their own changes
 - [x] Restrict approval records to controlled roles (Quality, Business Owner, System Owner, IT Security)
 - [ ] Extend segregation-of-duties rules to assessor, implementer, and verifier
 - [ ] Add configurable multi-approver matrices and rejection/resubmission policies
 - [ ] Model electronic-signature meaning and re-authentication where applicable
-- [ ] Add administrative user and role audit events
+- [x] Add security audit events for failed login and authorization attempts
 
 ### Priority 2 — Execution evidence
 
