@@ -109,3 +109,15 @@ def test_only_admin_can_read_security_events(client: TestClient):
     allowed = client.get("/auth/security-events", headers=bearer("admin.demo", Role.admin))
     assert allowed.status_code == 200
     assert allowed.json()["count"] >= 1
+
+
+def test_read_endpoints_require_authentication(client: TestClient):
+    created = client.post(
+        "/changes", json=valid_change(), headers=bearer("requester.demo", Role.requester)
+    )
+    assert created.status_code == 201
+    change_id = created.json()["id"]
+    paths = ["/changes", f"/changes/{change_id}", f"/changes/{change_id}/impact", f"/changes/{change_id}/activity"]
+    for path in paths:
+        assert client.get(path).status_code == 401, path
+        assert client.get(path, headers=bearer("requester.demo", Role.requester)).status_code != 401, path

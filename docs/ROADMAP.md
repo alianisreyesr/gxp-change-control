@@ -24,7 +24,7 @@
 
 ### Quality, governance, and release
 
-- [x] 78 pytest tests across authentication, API, schema, time-zone, authorization, and full-workflow behavior
+- [x] 79 pytest tests across authentication, API, schema, time-zone, authorization, and full-workflow behavior
 - [x] TypeScript type checking and Vite production build
 - [x] Required CI aggregate gate
 - [x] Bandit, `pip-audit`, and `npm audit`

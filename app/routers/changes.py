@@ -45,7 +45,7 @@ def _log(conn, change_id: str, actor: str, action: str, detail: str = "") -> Non
 
 
 @router.get("", response_model=list[ChangeOut])
-def list_changes(status: StatusFilter = None):
+def list_changes(user: CurrentUser, status: StatusFilter = None):
     with get_conn() as conn:
         if status is not None:
             rows = conn.execute(
@@ -94,7 +94,7 @@ def create_change(body: ChangeCreate, user: RequesterUser):
 
 
 @router.get("/{change_id}", response_model=ChangeOut)
-def get_change(change_id: ChangeIdPath):
+def get_change(change_id: ChangeIdPath, user: CurrentUser):
     with get_conn() as conn:
         row = conn.execute("SELECT * FROM changes WHERE id = ?", (change_id,)).fetchone()
     if not row:
@@ -182,7 +182,7 @@ def record_impact(change_id: ChangeIdPath, body: ImpactAssessmentIn, user: Asses
 
 
 @router.get("/{change_id}/impact", response_model=ImpactAssessmentOut)
-def get_impact(change_id: ChangeIdPath):
+def get_impact(change_id: ChangeIdPath, user: CurrentUser):
     with get_conn() as conn:
         ia = conn.execute(
             "SELECT * FROM impact_assessments WHERE change_id = ?", (change_id,)
@@ -281,7 +281,7 @@ def advance(change_id: ChangeIdPath, actor: ActorParam, user: CurrentUser):
 
 
 @router.get("/{change_id}/activity", response_model=list[ActivityOut])
-def activity(change_id: ChangeIdPath):
+def activity(change_id: ChangeIdPath, user: CurrentUser):
     with get_conn() as conn:
         rows = conn.execute(
             "SELECT * FROM activity_log WHERE change_id = ? ORDER BY id DESC", (change_id,)

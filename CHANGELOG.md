@@ -4,6 +4,17 @@ All notable changes to this portfolio project are documented in this file.
 
 The project follows semantic versioning for public portfolio releases. Version numbers describe the repository's software baseline; they do not indicate regulatory validation, approval, or fitness for a regulated intended use.
 
+## [Unreleased]
+
+### Added
+
+- JWT authentication with role-based access control and segregation of duties for mutating workflow actions
+- Authentication is now required on the read endpoints (`GET /changes`, `/changes/{id}`, `/changes/{id}/impact`, `/changes/{id}/activity`); unauthenticated requests receive 401
+
+### Changed
+
+- Test suite now contains 79 passing pytest tests
+
 ## [1.0.0] — 2026-08-17
 
 ### Added
@@ -23,7 +34,7 @@ The project follows semantic versioning for public portfolio releases. Version n
 
 ### Quality and security
 
-- 68 passing pytest tests across eight modules
+- 68 passing pytest tests across eight modules at the 1.0.0 baseline (79 tests in the current suite; see Unreleased)
 - End-to-end API tests for approval, rejection, resubmission, request-for-information, closure, and invalid transitions
 - Release-version consistency checks across FastAPI, the health endpoint, frontend package, Sonar configuration, and changelog
 - TypeScript type checking and Vite production build in CI
@@ -44,7 +55,7 @@ The project follows semantic versioning for public portfolio releases. Version n
 
 ### Known limitations
 
-- No authentication, role-based authorization, segregation of duties, or electronic signatures
+- At the 1.0.0 baseline there was no authentication or authorization (since added; see Unreleased). Electronic signatures are still not implemented
 - No dedicated implementation-task or verification-evidence records
 - SQLite is intended for local demonstration, not governed multi-user operation
 - Activity records are protected by application behavior, not an independently secured audit subsystem

@@ -5,7 +5,7 @@
 [![CI](https://github.com/alianisreyesr/gxp-change-control/actions/workflows/ci.yml/badge.svg)](https://github.com/alianisreyesr/gxp-change-control/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/alianisreyesr/gxp-change-control/actions/workflows/codeql.yml/badge.svg)](https://github.com/alianisreyesr/gxp-change-control/actions/workflows/codeql.yml)
 ![Release](https://img.shields.io/badge/release-v1.0.0-2ea44f?style=flat)
-![Tests](https://img.shields.io/badge/tests-78%20passing-brightgreen?style=flat)
+![Tests](https://img.shields.io/badge/tests-79%20passing-brightgreen?style=flat)
 ![License](https://img.shields.io/badge/license-MIT-green?style=flat)
 
 ![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat&logo=python&logoColor=white)
@@ -166,7 +166,7 @@ Never load real change-control records, employee identifiers, credentials, valid
 
 ## Validation and quality gates
 
-The current baseline includes **78 passing pytest tests across nine test modules**. Coverage includes authentication, role authorization, security events, full workflow transitions, segregation of duties, JSON Schema contracts, ISO date-time rules, DST folds and gaps, and non-hour DST transitions.
+The current baseline includes **79 passing pytest tests across nine test modules**. Coverage includes authentication, role authorization, security events, full workflow transitions, segregation of duties, JSON Schema contracts, ISO date-time rules, DST folds and gaps, and non-hour DST transitions.
 
 GitHub Actions gates changes with:
 
