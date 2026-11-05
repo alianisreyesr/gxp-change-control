@@ -10,7 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from app.schemas_registry import build_all  # noqa: E402
+from app.schemas_registry import build_all
 
 OUT = ROOT / "schemas"
 

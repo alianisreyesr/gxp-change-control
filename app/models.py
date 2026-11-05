@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from enum import Enum
-from typing import Annotated, Optional
+from typing import Annotated
 
 from pydantic import (
     AfterValidator,
@@ -165,8 +165,8 @@ class ChangeCreate(PortfolioModel):
     change_type: ChangeType
     priority: Priority = Priority.medium
     requester: PersonId
-    business_justification: Optional[str] = Field(default=None, max_length=2000)
-    target_implementation_date: Optional[IsoDate] = Field(
+    business_justification: str | None = Field(default=None, max_length=2000)
+    target_implementation_date: IsoDate | None = Field(
         default=None,
         description="Planned implementation calendar date (YYYY-MM-DD, not in the past)",
     )
@@ -200,11 +200,12 @@ class ChangeCreate(PortfolioModel):
 
     @model_validator(mode="after")
     def priority_and_dates(self):
-        if self.priority in (Priority.high, Priority.critical, "high", "critical"):
-            if not self.business_justification or len(self.business_justification.strip()) < 15:
-                raise ValueError(
-                    "business_justification (min 15 chars) is required when priority is high or critical"
-                )
+        if self.priority in (Priority.high, Priority.critical, "high", "critical") and (
+            not self.business_justification or len(self.business_justification.strip()) < 15
+        ):
+            raise ValueError(
+                "business_justification (min 15 chars) is required when priority is high or critical"
+            )
         if self.target_implementation_date:
             d = parse_iso_date(self.target_implementation_date)
             assert_target_not_in_past(d)
@@ -220,8 +221,8 @@ class ChangeOut(PortfolioModel):
     priority: Priority
     status: Status
     requester: str
-    business_justification: Optional[str] = None
-    target_implementation_date: Optional[str] = Field(
+    business_justification: str | None = None
+    target_implementation_date: str | None = Field(
         default=None,
         json_schema_extra={"format": "date"},
     )
@@ -260,35 +261,37 @@ class ImpactAssessmentIn(PortfolioModel):
         if self.residual_risk in (ResidualRisk.high, "high") and len(self.risk_summary) < 40:
             raise ValueError("risk_summary must be at least 40 characters when residual_risk is high")
 
-        if hit_count >= 3 and self.residual_risk in (ResidualRisk.low, "low"):
-            if len(self.risk_summary) < 60:
-                raise ValueError(
-                    "when three or more impact flags are true, residual_risk=low requires "
-                    "a detailed risk_summary (min 60 chars) explaining why residual risk remains low"
-                )
+        if (
+            hit_count >= 3
+            and self.residual_risk in (ResidualRisk.low, "low")
+            and len(self.risk_summary) < 60
+        ):
+            raise ValueError(
+                "when three or more impact flags are true, residual_risk=low requires "
+                "a detailed risk_summary (min 60 chars) explaining why residual risk remains low"
+            )
         return self
 
 
 class ImpactAssessmentOut(ImpactAssessmentIn):
     id: str
     change_id: ChangeIdStr
-    assessed_at: Optional[IsoDateTime] = None
+    assessed_at: IsoDateTime | None = None
 
 
 class ApprovalIn(PortfolioModel):
     role: ApprovalRole
     decision: Decision
-    comment: Optional[str] = Field(default=None, max_length=2000)
+    comment: str | None = Field(default=None, max_length=2000)
     actor: PersonId
 
     @model_validator(mode="after")
     def decision_comment_rules(self):
         decision = self.decision.value if isinstance(self.decision, Decision) else self.decision
-        if decision in ("reject", "request_info"):
-            if not self.comment or len(self.comment.strip()) < 10:
-                raise ValueError(
-                    f"comment (min 10 chars) is required when decision is '{decision}'"
-                )
+        if decision in ("reject", "request_info") and (
+            not self.comment or len(self.comment.strip()) < 10
+        ):
+            raise ValueError(f"comment (min 10 chars) is required when decision is '{decision}'")
         return self
 
 
@@ -303,7 +306,7 @@ class ActivityOut(PortfolioModel):
     change_id: str
     actor: str
     action: str = Field(min_length=1, max_length=120)
-    detail: Optional[str] = None
+    detail: str | None = None
     created_at: IsoDateTime
 
 

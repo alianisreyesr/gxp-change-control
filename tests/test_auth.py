@@ -121,3 +121,75 @@ def test_read_endpoints_require_authentication(client: TestClient):
     for path in paths:
         assert client.get(path).status_code == 401, path
         assert client.get(path, headers=bearer("requester.demo", Role.requester)).status_code != 401, path
+
+
+def _login(client: TestClient, password: str):
+    return client.post("/auth/token", json={"username": "requester.demo", "password": password})
+
+
+def test_login_expires_in_follows_configured_ttl(client: TestClient, monkeypatch):
+    from app import auth
+
+    assert _login(client, "RequesterDemo!2026").json()["expires_in"] == auth.ACCESS_TOKEN_TTL_SECONDS
+    monkeypatch.setattr("app.routers.auth.ACCESS_TOKEN_TTL_SECONDS", 900)
+    assert _login(client, "RequesterDemo!2026").json()["expires_in"] == 900
+
+
+def test_login_is_throttled_after_repeated_failures(client: TestClient):
+    from app.auth import login_throttle
+
+    for _ in range(login_throttle.max_failures):
+        assert _login(client, "wrong-password").status_code == 401
+    blocked = _login(client, "RequesterDemo!2026")
+    assert blocked.status_code == 429
+    assert int(blocked.headers["Retry-After"]) >= 1
+    with sqlite3.connect(database.DB_PATH) as conn:
+        action = conn.execute("SELECT action FROM security_events ORDER BY id DESC LIMIT 1").fetchone()[0]
+    assert action == "login_throttled"
+
+
+def test_successful_login_resets_failure_counter(client: TestClient):
+    from app.auth import login_throttle
+
+    for _ in range(login_throttle.max_failures - 1):
+        assert _login(client, "wrong-password").status_code == 401
+    assert _login(client, "RequesterDemo!2026").status_code == 200
+    assert _login(client, "wrong-password").status_code == 401  # counter restarted
+
+
+def test_login_throttle_window_expires(monkeypatch):
+    from app import auth
+
+    throttle = auth.LoginThrottle(max_failures=2, window_seconds=10)
+    clock = [1000.0]
+    monkeypatch.setattr(auth.time, "monotonic", lambda: clock[0])
+    throttle.record_failure("c", "u")
+    throttle.record_failure("c", "U")
+    assert throttle.retry_after("c", "u") > 0
+    clock[0] += 11
+    assert throttle.retry_after("c", "u") == 0
+
+
+def test_jwt_secret_is_required_in_production(monkeypatch):
+    from app import auth
+
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.delenv("JWT_SECRET_KEY", raising=False)
+    with pytest.raises(RuntimeError, match="JWT_SECRET_KEY"):
+        auth._load_secret()
+    monkeypatch.setenv("JWT_SECRET_KEY", "too-short")
+    with pytest.raises(RuntimeError, match="JWT_SECRET_KEY"):
+        auth._load_secret()
+    monkeypatch.setenv("JWT_SECRET_KEY", "x" * 40)
+    assert auth._load_secret() == "x" * 40
+
+
+def test_jwt_secret_in_development_uses_env_or_warns(monkeypatch):
+    from app import auth
+
+    monkeypatch.setenv("ENVIRONMENT", "development")
+    monkeypatch.setenv("JWT_SECRET_KEY", "dev-secret")
+    assert auth._load_secret() == "dev-secret"
+    monkeypatch.delenv("JWT_SECRET_KEY")
+    with pytest.warns(UserWarning, match="ephemeral"):
+        assert len(auth._load_secret()) >= 32

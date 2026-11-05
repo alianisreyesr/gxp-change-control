@@ -6,8 +6,11 @@ import hashlib
 import hmac
 import os
 import secrets
+import threading
+import time
+import warnings
 from collections.abc import Callable
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 from typing import Annotated
 
@@ -53,10 +56,95 @@ _USERS = {
     "verifier.demo": (Role.verifier, "6778702d76657269666965722e64656d6f", "e03a46d1e0f13ee433100231481f2a9d878d63970badcc05a5d266213a5064e9"),
     "admin.demo": (Role.admin, "6778702d61646d696e2e64656d6f", "2ae159df8e7108f3f1ed00fb7f3636e46fb2a04b561680a8fe821094d8c8d134"),
 }
-_SECRET = os.getenv("JWT_SECRET_KEY") or secrets.token_urlsafe(48)
 _ALGORITHM = "HS256"
 _EXPIRES_MINUTES = int(os.getenv("JWT_EXPIRES_MINUTES", "60"))
+_PRODUCTION_ENVIRONMENTS = {"production", "prod", "staging"}
+_MIN_SECRET_LENGTH = 32
+
+
+def _load_secret() -> str:
+    """Return the JWT signing key from JWT_SECRET_KEY.
+
+    Production-like environments (ENVIRONMENT=production|prod|staging) must provide a
+    strong, stable secret; startup fails otherwise. In development an ephemeral random
+    secret is generated, so tokens are invalidated on every restart and do not work
+    across multiple workers.
+    """
+    configured = os.getenv("JWT_SECRET_KEY")
+    environment = os.getenv("ENVIRONMENT", "development").strip().lower()
+    if environment in _PRODUCTION_ENVIRONMENTS:
+        if not configured or len(configured) < _MIN_SECRET_LENGTH:
+            raise RuntimeError(
+                f"JWT_SECRET_KEY must be set to at least {_MIN_SECRET_LENGTH} characters "
+                f"when ENVIRONMENT={environment}"
+            )
+        return configured
+    if configured:
+        return configured
+    warnings.warn(
+        "JWT_SECRET_KEY is not set; using an ephemeral secret (tokens reset on restart). "
+        "Set JWT_SECRET_KEY for any shared or production deployment.",
+        stacklevel=2,
+    )
+    return secrets.token_urlsafe(48)
+
+
+_SECRET = _load_secret()
+ACCESS_TOKEN_TTL_SECONDS = _EXPIRES_MINUTES * 60
 _bearer = HTTPBearer(auto_error=False)
+
+
+class LoginThrottle:
+    """In-memory sliding-window limiter for failed logins (per client + username).
+
+    Process-local by design for this demo; a multi-worker deployment needs a shared
+    store (e.g. Redis) or a rate-limiting reverse proxy in front of the API.
+    """
+
+    def __init__(self, max_failures: int, window_seconds: int) -> None:
+        self.max_failures = max_failures
+        self.window_seconds = window_seconds
+        self._failures: dict[tuple[str, str], list[float]] = {}
+        self._lock = threading.Lock()
+
+    def _recent(self, key: tuple[str, str], now: float) -> list[float]:
+        cutoff = now - self.window_seconds
+        recent = [t for t in self._failures.get(key, []) if t > cutoff]
+        if recent:
+            self._failures[key] = recent
+        else:
+            self._failures.pop(key, None)
+        return recent
+
+    def retry_after(self, client: str, username: str) -> int:
+        """Seconds until another attempt is allowed (0 when not throttled)."""
+        key = (client, username.lower())
+        with self._lock:
+            now = time.monotonic()
+            recent = self._recent(key, now)
+            if len(recent) < self.max_failures:
+                return 0
+            return max(1, int(recent[0] + self.window_seconds - now) + 1)
+
+    def record_failure(self, client: str, username: str) -> None:
+        key = (client, username.lower())
+        with self._lock:
+            now = time.monotonic()
+            self._recent(key, now)
+            self._failures.setdefault(key, []).append(now)
+
+    def reset(self, client: str | None = None, username: str | None = None) -> None:
+        with self._lock:
+            if client is None and username is None:
+                self._failures.clear()
+            else:
+                self._failures.pop((client or "", (username or "").lower()), None)
+
+
+login_throttle = LoginThrottle(
+    max_failures=int(os.getenv("LOGIN_MAX_ATTEMPTS", "5")),
+    window_seconds=int(os.getenv("LOGIN_WINDOW_SECONDS", "300")),
+)
 
 
 def authenticate(username: str, password: str) -> User | None:
@@ -71,7 +159,7 @@ def authenticate(username: str, password: str) -> User | None:
 
 
 def create_access_token(user: User, expires_minutes: int | None = None) -> str:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     minutes = _EXPIRES_MINUTES if expires_minutes is None else expires_minutes
     return jwt.encode(
         {"sub": user.username, "role": user.role.value, "iat": now, "exp": now + timedelta(minutes=minutes)},

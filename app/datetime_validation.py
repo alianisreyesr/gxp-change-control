@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import re
 from dataclasses import asdict, dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
+from datetime import tzinfo as TzInfo
 from enum import Enum
-from typing import Literal, Optional
+from typing import Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -65,7 +66,7 @@ def parse_iso_date(value: str) -> date:
         raise ValueError(f"invalid calendar date: {value}") from exc
 
 
-def _validate_offset_bounds(tzinfo: timezone | ZoneInfo, when: datetime) -> None:
+def _validate_offset_bounds(tzinfo: TzInfo, when: datetime) -> None:
     off = tzinfo.utcoffset(when)
     if off is None:
         raise ValueError("timezone produced no UTC offset")
@@ -80,7 +81,7 @@ def parse_iso_datetime(value: str) -> datetime:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"invalid date-time; empty. {DATETIME_HINT}")
     raw = value.strip()
-    if raw.endswith("Z") or raw.endswith("z"):
+    if raw.endswith(("Z", "z")):
         raw = raw[:-1] + "+00:00"
     try:
         dt = datetime.fromisoformat(raw)
@@ -98,7 +99,7 @@ def parse_iso_datetime(value: str) -> datetime:
 def to_utc(dt: datetime) -> datetime:
     if dt.tzinfo is None:
         raise ValueError("cannot convert naive datetime to UTC")
-    return dt.astimezone(timezone.utc)
+    return dt.astimezone(UTC)
 
 
 def ensure_iso_datetime_str(value: str) -> str:
@@ -111,11 +112,11 @@ def ensure_iso_date_str(value: str) -> str:
 
 
 def utc_now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def assert_target_not_in_past(target: date, *, today: date | None = None) -> None:
-    ref = today or datetime.now(timezone.utc).date()
+    ref = today or datetime.now(UTC).date()
     if target < ref:
         raise ValueError(
             f"target_implementation_date {target.isoformat()} is in the past "
@@ -141,7 +142,7 @@ def _parse_naive_local(local_iso: str) -> datetime:
     if not isinstance(local_iso, str) or not local_iso.strip():
         raise ValueError("local_iso is required")
     raw = local_iso.strip()
-    if raw.endswith("Z") or raw.endswith("z") or re.search(r"[+-]\d{2}:\d{2}$", raw):
+    if raw.endswith(("Z", "z")) or re.search(r"[+-]\d{2}:\d{2}$", raw):
         raise ValueError(
             "local_iso must be naive wall time (no Z/offset); "
             "use parse_iso_datetime for aware API stamps"
@@ -169,7 +170,7 @@ def _fold_instant(naive: datetime, zi: ZoneInfo, fold: Literal[0, 1]) -> FoldIns
     aware = naive.replace(tzinfo=zi, fold=fold)
     # A same-zone conversion is a no-op. Round-trip through UTC so ZoneInfo
     # normalizes gaps and overlaps before comparing the civil fields.
-    back = aware.astimezone(timezone.utc).astimezone(zi)
+    back = aware.astimezone(UTC).astimezone(zi)
     if _civil_tuple(back.replace(tzinfo=None)) != _civil_tuple(naive):
         return None
     # For ambiguous times both folds are real but offsets differ; for unique they match.
@@ -241,7 +242,7 @@ def convert_local_iso_to_utc(
     local_iso: str,
     iana_zone: str,
     *,
-    fold: Optional[Literal[0, 1]] = None,
+    fold: Literal[0, 1] | None = None,
 ) -> str:
     """
     Convert naive local wall time + IANA zone → UTC ISO.

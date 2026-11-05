@@ -1,19 +1,16 @@
 """Timezone validation policy tests."""
 
 import pytest
-from pydantic import ValidationError
+from fastapi.testclient import TestClient
 
 from app.datetime_validation import (
     convert_local_iso_to_utc,
     ensure_iso_datetime_str,
     parse_iso_datetime,
-    to_utc,
     validate_iana_zone,
 )
-from app.models import ChangeOut
-from fastapi.testclient import TestClient
-
 from app.main import app
+from app.models import ChangeOut
 
 client = TestClient(app)
 

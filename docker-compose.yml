@@ -9,6 +9,9 @@ services:
       - change-data:/app/data
     environment:
       - PYTHONDONTWRITEBYTECODE=1
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-}
+      - JWT_EXPIRES_MINUTES=${JWT_EXPIRES_MINUTES:-60}
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"]
       interval: 15s

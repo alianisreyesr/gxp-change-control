@@ -11,9 +11,15 @@ The project follows semantic versioning for public portfolio releases. Version n
 - JWT authentication with role-based access control and segregation of duties for mutating workflow actions
 - Authentication is now required on the read endpoints (`GET /changes`, `/changes/{id}`, `/changes/{id}/impact`, `/changes/{id}/activity`); unauthenticated requests receive 401
 
+- Failed-login throttling (HTTP 429 with `Retry-After`) and sanitised usernames in security events
+- `ENVIRONMENT`/`JWT_SECRET_KEY` handling: production-like environments fail fast without a strong secret
+- CI now runs ruff and mypy; npm ci; least-privilege workflow permissions; coverage gate 85%
+
 ### Changed
 
-- Test suite now contains 79 passing pytest tests
+- Login `expires_in` now reflects `JWT_EXPIRES_MINUTES` instead of a hard-coded 3600
+- Runtime and development requirements are separated and pinned; all ruff and mypy findings fixed
+- Test suite now contains 84 passing pytest tests
 
 ## [1.0.0] — 2026-08-17
 

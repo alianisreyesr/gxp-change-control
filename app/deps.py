@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Optional
+from typing import Annotated
 
 from fastapi import Path, Query
 from pydantic import AfterValidator, TypeAdapter
@@ -45,7 +45,7 @@ ActorParam = Annotated[
 ]
 
 StatusFilter = Annotated[
-    Optional[Status],
+    Status | None,
     Query(
         description="Optional workflow status filter",
         examples=["pending_approval"],

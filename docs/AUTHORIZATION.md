@@ -1,6 +1,18 @@
 # Authentication and authorization
 
-The portfolio demo issues one-hour HS256 JWTs from `POST /auth/token`. A random signing secret is generated at process start for local use; deployments must set `JWT_SECRET_KEY` so sessions survive restarts and tokens are isolated per environment.
+The portfolio demo issues HS256 JWTs from `POST /auth/token`. Lifetime comes from `JWT_EXPIRES_MINUTES` (default 60) and the `expires_in` field of the login response reports the same value in seconds.
+
+## Configuration
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `JWT_SECRET_KEY` | none | HS256 signing key. **Required (at least 32 characters) when `ENVIRONMENT` is `production`, `prod` or `staging`; the API refuses to start otherwise.** In development an ephemeral random key is generated with a warning, so tokens reset on restart and do not work across workers. |
+| `ENVIRONMENT` | `development` | Selects the strict secret check above. |
+| `JWT_EXPIRES_MINUTES` | `60` | Token lifetime. |
+| `LOGIN_MAX_ATTEMPTS` | `5` | Failed logins per client IP + username before HTTP 429. |
+| `LOGIN_WINDOW_SECONDS` | `300` | Sliding window for the failed-login limit. |
+
+The login throttle is in-process; a multi-worker deployment needs a shared store or a rate-limiting proxy. Throttled attempts are recorded as `login_throttled` security events and usernames are sanitised before they are logged.
 
 ## Demo accounts
 

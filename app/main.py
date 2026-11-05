@@ -46,7 +46,7 @@ app.add_middleware(
 async def pydantic_validation_handler(_: Request, exc: RequestValidationError):
     details: list[ErrorDetail] = []
     for err in exc.errors():
-        loc = [str(x) for x in err.get("loc", ())]
+        loc: list[str | int] = [str(x) for x in err.get("loc", ())]
         details.append(
             ErrorDetail(
                 loc=loc,

@@ -136,7 +136,8 @@ Vite proxies `/api` to the API on port 8000.
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 python -m pip install --upgrade pip
-pip install -r requirements.txt
+pip install -r requirements-dev.txt   # runtime only: requirements.txt
+# Optional: export JWT_SECRET_KEY (required when ENVIRONMENT=production), see docs/AUTHORIZATION.md
 uvicorn app.main:app --reload
 
 # UI, in another terminal
@@ -179,6 +180,7 @@ GitHub Actions gates changes with:
 Run the principal checks locally:
 
 ```bash
+ruff check . && mypy app
 pytest tests/ -v --cov=app --cov-report=term-missing
 
 cd frontend
@@ -187,7 +189,6 @@ npm run typecheck
 npm run build
 
 # From the repository root
-pip install "bandit[toml]" pip-audit
 bandit -r app -c bandit.yaml -ll
 pip-audit -r requirements.txt
 cd frontend && npm audit --audit-level=high

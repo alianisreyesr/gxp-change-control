@@ -1,9 +1,37 @@
+# Python
 __pycache__/
+*.py[cod]
 .venv/
 venv/
-*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+*.egg-info/
+
+# Reports
+bandit-report.json
+
+# Secrets and local config
 .env
+.env.*
+!.env.example
+
+# Local data
 data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+
+# Frontend
 frontend/node_modules/
 frontend/dist/
+frontend/*.tsbuildinfo
+
+# Editors / OS
+.idea/
+.vscode/
 .DS_Store

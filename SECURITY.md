@@ -63,9 +63,11 @@ The repository currently includes:
 - Pydantic and JSON Schema validation;
 - parameterized SQLite statements;
 - explicit workflow transitions;
+- JWT authentication with role-bound workflow transitions and segregation of duties (`JWT_SECRET_KEY` is mandatory in production-like environments);
+- in-process failed-login throttling (HTTP 429) and sanitised usernames in `security_events`;
 - attributable-actor restrictions;
 - server-generated UTC timestamps;
-- Bandit, `pip-audit`, `npm audit`, CodeQL, and optional Sonar analysis;
+- `ruff`, `mypy`, Bandit, `pip-audit`, `npm audit`, CodeQL, and optional Sonar analysis in CI;
 - a non-root API container.
 
-These controls reduce common development risks. They do not provide authentication, authorization, electronic signatures, protected audit storage, secure hosting, formal threat modeling, penetration testing, or regulatory validation.
+These controls reduce common development risks. The demo accounts are synthetic and the login throttle is process-local. They do not provide an identity provider, electronic signatures, protected audit storage, secure hosting, formal threat modeling, penetration testing, or regulatory validation.

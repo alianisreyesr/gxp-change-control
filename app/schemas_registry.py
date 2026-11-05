@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from pydantic import BaseModel
+
 from app.models import (
+    ActivityOut,
     ApprovalIn,
     ApprovalOut,
-    ActivityOut,
     ChangeCreate,
     ChangeOut,
     HealthOut,
@@ -20,7 +22,7 @@ from app.models import (
 SCHEMA_DIALECT = "https://json-schema.org/draft/2020-12/schema"
 
 # Public names → model class
-MODEL_MAP: dict[str, type] = {
+MODEL_MAP: dict[str, type[BaseModel]] = {
     "change-create": ChangeCreate,
     "change-out": ChangeOut,
     "impact-assessment-in": ImpactAssessmentIn,

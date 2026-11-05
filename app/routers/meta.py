@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal, Optional
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import Field
@@ -27,7 +27,7 @@ class LocalToUtcIn(PortfolioModel):
         description="IANA time zone id",
         examples=["America/New_York", "America/Puerto_Rico", "UTC"],
     )
-    fold: Optional[Literal[0, 1]] = Field(
+    fold: Literal[0, 1] | None = Field(
         default=None,
         description="Required when local time is DST-ambiguous: 0=first occurrence, 1=second",
     )
@@ -36,7 +36,7 @@ class LocalToUtcIn(PortfolioModel):
 class LocalToUtcOut(PortfolioModel):
     utc_iso: str
     iana_zone: str
-    fold_used: Optional[int] = None
+    fold_used: int | None = None
     kind: str
     policy: str
 
@@ -100,7 +100,7 @@ def local_to_utc(body: LocalToUtcIn):
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    fold_used: Optional[int] = body.fold
+    fold_used: int | None = body.fold
     if fold_used is None and analysis.instants:
         fold_used = analysis.instants[0].fold
 

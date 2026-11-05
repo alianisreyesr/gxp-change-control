@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -33,9 +33,9 @@ def _offset_hours(utc_iso: str, local_iso: str) -> float:
     assert utc.tzinfo is not None
     # Reconstruct expected: utc + offset ≈ local wall in absolute terms
     # offset_hours = local_as_if_utc - utc
-    local_as_utc = local.replace(tzinfo=timezone.utc)
-    delta = local_as_utc - utc.astimezone(timezone.utc).replace(tzinfo=None).replace(
-        tzinfo=timezone.utc
+    local_as_utc = local.replace(tzinfo=UTC)
+    delta = local_as_utc - utc.astimezone(UTC).replace(tzinfo=None).replace(
+        tzinfo=UTC
     )
     # Simpler: from analysis instants utcoffset_seconds
     return delta.total_seconds() / 3600.0
@@ -88,7 +88,6 @@ def test_lord_howe_half_hour_and_full_hour_offsets(
     [
         "2025-07-15T01:30:00+10:30",  # winter local noon-ish in UTC terms
         "2025-01-15T01:00:00+11:00",
-        "2025-07-15T01:30:00+10:30",
     ],
 )
 def test_lord_howe_aware_offsets_accepted_on_api_stamps(aware_iso: str):
@@ -176,7 +175,7 @@ def test_api_analyze_lord_howe_summer():
     assert r.status_code == 200
     body = r.json()
     assert body["kind"] == "unique"
-    assert body["instants"][0]["utcoffset_seconds"] == int(11 * 3600)
+    assert body["instants"][0]["utcoffset_seconds"] == (11 * 3600)
 
 
 @pytest.mark.parametrize(
