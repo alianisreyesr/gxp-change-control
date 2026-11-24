@@ -16,7 +16,7 @@
 
 **Change requests · Impact assessment · Approvals · Verification · Activity evidence**
 
-*A portfolio-safe, full-stack prototype for controlled GxP-style change workflows*
+*Controlled GxP-style change workflow: impact assessment, role-aware approvals and immutable activity history — full-stack prototype (synthetic data)*
 
 [Screenshots](#portfolio-preview) · [Quick start](#quick-start) · [Case study](docs/CASE_STUDY.md) · [Workflow](#controlled-workflow) · [API](#api-surface) · [Quality gates](#validation-and-quality-gates) · [Security](SECURITY.md)
 
