@@ -256,7 +256,7 @@ Released under the [MIT License](LICENSE). The license permits use of the code; 
 
 <div align="center">
 
-**Built by [Alianis Reyes-Reyes](https://www.linkedin.com/in/alianis-reyes-reyes/)**
+**Built by [Alianis Reyes Reyes](https://www.linkedin.com/in/alianis-reyes-reyes/)**
 
 Information Systems @ UPRM · Eli Lilly Tech@Lilly Alumni
 
